@@ -1,4 +1,7 @@
+import { auth } from "../app/firebaseConfig";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Text,
   View,
@@ -6,19 +9,33 @@ import {
   TouchableOpacity,
   ImageBackground,
   Image,
-  StyleSheet
+  StyleSheet,
+  Alert
 } from "react-native";
 
-// Import images
+// Import background & logo
 const soccerImage = require("../assets/images/soccer.jpg");
 const soccerBall = require("../assets/images/soccer-ball.png"); // Soccer ball logo
 
+
 export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const router = useRouter(); // ✅ Fix navigation issue
 
-  const handleLogin = () => {
-    console.log("User logged in!");
-    router.push("/Home"); // ✅ Redirect to Home
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter your email and password.");
+      return;
+    }
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      console.log("User logged in!");
+      router.push("/Home"); // Redirect to Home
+    } catch (error: any) {
+      Alert.alert("Login Failed", error.message);
+    }
   };
 
   return (
@@ -33,8 +50,22 @@ export default function LoginScreen() {
 
         {/* Input Fields */}
         <View style={styles.inputContainer}>
-          <TextInput style={styles.input} placeholder="Username or Email" placeholderTextColor="#aaa" />
-          <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#aaa" secureTextEntry />
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor="#aaa"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#aaa"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
 
           {/* Login Button */}
           <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
@@ -46,6 +77,7 @@ export default function LoginScreen() {
             <Text style={styles.forgotPassword}>Forgot password?</Text>
           </TouchableOpacity>
         </View>
+
 
         {/* Full-Width Boxed Sign-Up Option */}
         <View style={styles.footer}>
