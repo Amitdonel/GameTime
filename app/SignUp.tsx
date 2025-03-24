@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { auth } from "../app/firebaseConfig";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Text,
   View,
@@ -7,8 +9,11 @@ import {
   TouchableOpacity,
   ImageBackground,
   Image,
-  StyleSheet
+  StyleSheet,
+  Alert
 } from "react-native";
+
+
 
 // Import images
 const soccerImage = require("../assets/images/soccer.jpg");
@@ -20,14 +25,26 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const handleSignUp = () => {
-    // TODO: Implement sign-up logic here
-    console.log("User signed up!");
-  
-    // Redirect user to Home after successful sign-up
-    router.push("/Home");
+  const handleSignUp = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter a valid email and password.");
+      return;
+    }
+
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      Alert.alert("Success", "Account created successfully!", [
+        { text: "OK", onPress: () => router.push("/Login") },
+      ]);
+    } catch (error) {
+      if (error instanceof Error) {
+        Alert.alert("Sign Up Failed", error.message);
+      } else {
+        Alert.alert("Sign Up Failed", "An unknown error occurred.");
+      }
+    }
   };
-  
+
 
   return (
     <ImageBackground source={soccerImage} style={styles.background}>
@@ -73,7 +90,7 @@ export default function SignUpScreen() {
           />
 
           {/* Sign Up Button */}
-          <TouchableOpacity style={styles.signupButton} onPress={() => router.push("/Survey")}>
+          <TouchableOpacity style={styles.signupButton} onPress={handleSignUp}>
             <Text style={styles.signupButtonText}>Sign Up</Text>
           </TouchableOpacity>
 
@@ -151,7 +168,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
-  },
+  },  
   footer: {
     flex: 1,
     justifyContent: "flex-end",
