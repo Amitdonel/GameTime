@@ -1,4 +1,9 @@
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { useEffect, useState } from "react";
+import { getAuth } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../app/firebaseConfig";
+
 
 import React from "react";
 import {
@@ -10,20 +15,39 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-// Temporary user info (Replace with actual user data)
-const username = "Player123";
-const userImage = { uri: "https://via.placeholder.com/100" }; // Placeholder online image
+
+
 
 
 export default function HomeScreen() {
+  // Temporary user info (Replace with actual user data)
+  const userImage = { uri: "https://via.placeholder.com/100" }; // Placeholder online image
+
+  const [fullName, setFullName] = useState("Player");
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchUserName = async () => {
+      const user = getAuth().currentUser;
+      if (user) {
+        const userRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(userRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setFullName(data.name); // 👈 make sure "name" is saved during sign-up
+        }
+      }
+    };
+
+    fetchUserName();
+  }, []);
 
   return (
     <View style={styles.container}>
 
       {/* Header Section */}
       <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {username}</Text>
+        <Text style={styles.greeting}>Hello, {fullName}</Text>
         <TouchableOpacity onPress={() => router.push("/Profile")} style={styles.profileWrapper}>
           <Image source={userImage} style={styles.profileIcon} />
           <Ionicons name="person" size={24} color="white" style={styles.profileIconOverlay} />

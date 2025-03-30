@@ -1,3 +1,6 @@
+import { db } from "../app/firebaseConfig"; // Adjust path if needed
+import { getAuth } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
@@ -38,18 +41,38 @@ export default function SurveyScreen() {
         );
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (positions.length === 0 || !skillLevel || !stamina || !fieldType || !playFrequency || !playRadius) {
-            Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
-            return;
+          Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
+          return;
         }
-
-        console.log("Survey Submitted:", { positions, skillLevel, stamina, fieldType, playFrequency, playRadius, dob });
-
-        Alert.alert("Success", "Survey submitted successfully!", [
+      
+        const user = getAuth().currentUser;
+      
+        if (!user) {
+          Alert.alert("Error", "User not authenticated");
+          return;
+        }
+      
+        try {
+          // Write the survey data to Firestore under the user's UID
+          await setDoc(doc(db, "surveys", user.uid), {
+            positions,
+            skillLevel,
+            stamina,
+            fieldType,
+            playFrequency,
+            playRadius,
+            dob: dob.toISOString(),
+          });
+      
+          Alert.alert("Success", "Survey submitted successfully!", [
             { text: "OK", onPress: () => router.push("/Login") },
-        ]);
-    };
+          ]);
+        } catch (error: any) {
+          Alert.alert("Error", error.message || "An error occurred while saving survey.");
+        }
+      };
 
 
     return (

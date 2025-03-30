@@ -2,6 +2,8 @@ import { auth } from "../app/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "expo-router";
 import { useState } from "react";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../app/firebaseConfig"; // adjust if needed
 import {
   Text,
   View,
@@ -12,7 +14,6 @@ import {
   StyleSheet,
   Alert
 } from "react-native";
-
 
 
 // Import images
@@ -26,15 +27,24 @@ export default function SignUpScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const handleSignUp = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please enter a valid email and password.");
+    if (!email || !password || !name || !username) {
+      Alert.alert("Error", "Please fill in all fields.");
       return;
     }
-
+  
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+  
+      // ✅ Save user info in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        name,
+        username,
+        email,
+      });
+  
       Alert.alert("Success", "Account created successfully!", [
-        { text: "OK", onPress: () => router.push("/Login") },
+        { text: "OK", onPress: () => router.push("/Survey") },
       ]);
     } catch (error) {
       if (error instanceof Error) {
