@@ -70,14 +70,14 @@ export default function HomeScreen() {
           <Ionicons name="home" size={35} color="#1877F2" />
         </TouchableOpacity>
 
-        {/* Search Icon */}
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
-          <Ionicons name="search" size={35} color="#1877F2" />
-        </TouchableOpacity>
-
         {/* Plus Icon (Already Implemented) */}
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Plus")}>
-          <Ionicons name="add-circle" size={35} color="#000000" />
+          <Ionicons name="add-circle" size={35} color="#1877F2" />
+        </TouchableOpacity>
+
+         {/* Search Icon */}
+         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
+          <Ionicons name="search" size={35} color="#000000" />
         </TouchableOpacity>
 
         {/* My Groups Icon */}
