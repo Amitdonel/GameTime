@@ -77,7 +77,7 @@ export default function HomeScreen() {
 
          {/* Search Icon */}
          <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
-          <Ionicons name="search" size={35} color="#000000" />
+          <Ionicons name="search" size={35} color="#000001" />
         </TouchableOpacity>
 
         {/* My Groups Icon */}
