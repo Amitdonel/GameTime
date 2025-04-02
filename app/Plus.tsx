@@ -8,25 +8,39 @@ import {
   Alert 
 } from "react-native";
 import { useRouter } from "expo-router";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { db } from "../app/firebaseConfig";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
 
 export default function PlusScreen() {
   const router = useRouter();
   
   const [eventName, setEventName] = useState("");
-  const [eventDate, setEventDate] = useState("");
+  const [eventDate, setEventDate] = useState(new Date()); // Default to today
   const [eventLocation, setEventLocation] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const handleCreateEvent = () => {
-    if (!eventName || !eventDate || !eventLocation) {
+  const handleCreateEvent = async () => {
+    if (!eventName || !eventLocation) {
       Alert.alert("Incomplete Form", "Please fill out all fields.");
       return;
     }
 
-    console.log("Event Created:", { eventName, eventDate, eventLocation });
+    try {
+      await addDoc(collection(db, "events"), {
+        name: eventName,
+        date: Timestamp.fromDate(eventDate),
+        location: eventLocation,
+        createdAt: Timestamp.now(),
+      });
 
-    Alert.alert("Success", "Event created successfully!", [
-      { text: "OK", onPress: () => router.push("/Home") },
-    ]);
+      Alert.alert("Success", "Event created successfully!", [
+        { text: "OK", onPress: () => router.push("/Home") },
+      ]);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      Alert.alert("Error", "Could not create event. Try again later.");
+    }
   };
 
   return (
@@ -40,13 +54,36 @@ export default function PlusScreen() {
         value={eventName}
         onChangeText={setEventName}
       />
-      <TextInput 
+
+      {/* Date Picker Field */}
+      <TouchableOpacity 
         style={styles.input} 
-        placeholder="Event Date" 
-        placeholderTextColor="#aaa" 
-        value={eventDate}
-        onChangeText={setEventDate}
-      />
+        onPress={() => setShowDatePicker(true)}
+      >
+        <Text style={{ color: "#000" }}>
+          {eventDate.toDateString()}  {/* Show selected date */}
+        </Text>
+      </TouchableOpacity>
+
+      {showDatePicker && (
+        <View style={styles.datePickerContainer}>
+          <DateTimePicker
+            value={eventDate}
+            mode="date"
+            display="spinner"
+            onChange={(event, selectedDate) => {
+              if (selectedDate) setEventDate(selectedDate);
+            }}
+          />
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={() => setShowDatePicker(false)}
+          >
+            <Text style={styles.confirmButtonText}>Confirm</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <TextInput 
         style={styles.input} 
         placeholder="Event Location" 
@@ -85,6 +122,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
   },
+  datePickerContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 10,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  confirmButton: {
+    backgroundColor: "#1877F2",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  confirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   createButton: {
     backgroundColor: "#1877F2",
     padding: 15,
@@ -99,3 +154,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+
