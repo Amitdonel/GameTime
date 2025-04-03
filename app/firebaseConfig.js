@@ -2,9 +2,9 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
-// Your web app's Firebase configuration
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyDFLafHIwX_ftLKQScwIQ6OO9HB888vdIk",
   authDomain: "gametime-e5a48.firebaseapp.com",
@@ -21,7 +21,15 @@ const app = initializeApp(firebaseConfig);
 // Export services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const analytics = getAnalytics(app); // Optional
+
+// ✅ Wrap analytics in isSupported to avoid crash
+let analytics;
+isSupported().then((supported) => {
+  if (supported) {
+    analytics = getAnalytics(app);
+  }
+});
 
 // Optional export for app
 export { app };
+
