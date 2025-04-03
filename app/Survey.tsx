@@ -1,8 +1,10 @@
 import { db } from "../app/firebaseConfig"; // Adjust path if needed
 import { getAuth } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
+import MapView, { Marker } from "react-native-maps";
+import * as Location from "expo-location";
 import {
     Text,
     View,
@@ -18,8 +20,11 @@ import Slider from "@react-native-community/slider";
 // Import the background image (same as Login page)
 const backgroundImage = require("../assets/images/soccer.jpg");
 
+import { useLocalSearchParams } from "expo-router";
 export default function SurveyScreen() {
     const router = useRouter();
+    const { from } = useLocalSearchParams();
+
 
     // State for selected answers
     const [positions, setPositions] = useState<string[]>([]);
@@ -31,8 +36,52 @@ export default function SurveyScreen() {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [tempDob, setTempDob] = useState(new Date()); // Temp value before confirmation
     const [playRadius, setPlayRadius] = useState(10);
+    const [location, setLocation] = useState({
+        latitude: 32.0853, // Default location (e.g., Tel Aviv)
+        longitude: 34.7818,
+    });
 
-    // Toggle selection for multi-choice question
+    const telAvivCoords = {
+        latitude: 32.0853,
+        longitude: 34.7818,
+    };
+
+    const [region, setRegion] = useState({
+        latitude: 32.0853, // Tel Aviv
+        longitude: 34.7818,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+    });
+
+
+
+    useEffect(() => {
+        (async () => {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== "granted") {
+            Alert.alert("Permission Denied", "Map will use default location (Tel Aviv).");
+            return;
+          }
+      
+          const currentLocation = await Location.getCurrentPositionAsync({});
+          const { latitude, longitude } = currentLocation.coords;
+      
+          setRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+      
+          setLocation({ latitude, longitude }); // Keep your marker in sync
+        })();
+      }, []);
+      
+
+
+
+
+    // ✅ Keep this exactly as is:
     const togglePosition = (role: string) => {
         setPositions((prevPositions) =>
             prevPositions.includes(role)
@@ -41,38 +90,52 @@ export default function SurveyScreen() {
         );
     };
 
+
     const handleSubmit = async () => {
         if (positions.length === 0 || !skillLevel || !stamina || !fieldType || !playFrequency || !playRadius) {
-          Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
-          return;
+            Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
+            return;
         }
-      
+
         const user = getAuth().currentUser;
-      
+
         if (!user) {
-          Alert.alert("Error", "User not authenticated");
-          return;
+            Alert.alert("Error", "User not authenticated");
+            return;
         }
-      
+        if (!location) {
+            Alert.alert("Missing Location", "Please select your location on the map.");
+            return;
+        }
         try {
-          // Write the survey data to Firestore under the user's UID
-          await setDoc(doc(db, "surveys", user.uid), {
-            positions,
-            skillLevel,
-            stamina,
-            fieldType,
-            playFrequency,
-            playRadius,
-            dob: dob.toISOString(),
-          });
-      
-          Alert.alert("Success", "Survey submitted successfully!", [
-            { text: "OK", onPress: () => router.push("/Login") },
-          ]);
+            // Write the survey data to Firestore under the user's UID
+            await setDoc(doc(db, "surveys", user.uid), {
+                positions,
+                skillLevel,
+                stamina,
+                fieldType,
+                playFrequency,
+                playRadius,
+                dob: dob.toISOString(),
+                location, // includes lat + long
+            });
+
+            Alert.alert("Success", "Survey submitted successfully!", [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    if (from === "profile") {
+                      router.push("/Profile");
+                    } else {
+                      router.push("/Login"); // default for new users
+                    }
+                  },
+                },
+              ]);
         } catch (error: any) {
-          Alert.alert("Error", error.message || "An error occurred while saving survey.");
+            Alert.alert("Error", error.message || "An error occurred while saving survey.");
         }
-      };
+    };
 
 
     return (
@@ -210,6 +273,27 @@ export default function SurveyScreen() {
                     </TouchableOpacity>
                 ))}
 
+                <View style={styles.questionBox}>
+                    <Text style={styles.question}>Insert your location</Text>
+                </View>
+
+                {location && (
+                    <View style={{ width: "90%", height: 300, marginVertical: 20 }}>
+                        <MapView
+                            style={{ flex: 1 }}
+                            region={region}
+                            onRegionChangeComplete={(newRegion) => setRegion(newRegion)} // Optional: track user pan/zoom
+                        >
+                            <Marker
+                                coordinate={region}
+                                pinColor="red"
+                            />
+                        </MapView>
+                    </View>
+                )}
+
+
+
                 {/* Submit Button */}
                 <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
                     <Text style={styles.submitButtonText}>Submit</Text>
@@ -332,15 +416,22 @@ const styles = StyleSheet.create({
         width: "90%",
         marginTop: 50, // Ensures it's fully visible
         marginBottom: 20,
-      },
-      backButton: {
+    },
+    backButton: {
         marginRight: 50, // Adds spacing between arrow & title
-      },
-      backArrow: {
+    },
+    backArrow: {
         marginTop: -40,
         marginLeft: -20,
         fontSize: 30,
         color: "white",
         fontWeight: "bold",
-      },
+    },
+    pinContainer: {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: [{ translateX: -18 }, { translateY: -36 }],
+        zIndex: 999,
+    },
 });
