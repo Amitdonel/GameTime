@@ -4,7 +4,6 @@ import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../app/firebaseConfig";
 
-
 import React from "react";
 import {
   Text,
@@ -15,83 +14,87 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-
-
-
-
 export default function HomeScreen() {
-  // Temporary user info (Replace with actual user data)
-  const userImage = { uri: "https://via.placeholder.com/100" }; // Placeholder online image
-
+  const [userImage, setUserImage] = useState({ uri: "https://via.placeholder.com/100" });
   const [fullName, setFullName] = useState("Player");
+  const [profileReady, setProfileReady] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    const fetchUserName = async () => {
+    let isMounted = true;
+
+    const fetchUserData = async () => {
       const user = getAuth().currentUser;
       if (user) {
         const userRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(userRef);
-        if (docSnap.exists()) {
+
+        if (docSnap.exists() && isMounted) {
           const data = docSnap.data();
-          setFullName(data.name); // 👈 make sure "name" is saved during sign-up
+          setFullName(data.name || "Player");
+
+          if (data.photoUrl && data.photoUrl.length > 5 && data.photoUrl !== userImage.uri) {
+            setUserImage({ uri: data.photoUrl });
+          }
         }
       }
     };
 
-    fetchUserName();
+    fetchUserData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
     <View style={styles.container}>
-
       {/* Header Section */}
       <View style={styles.header}>
         <Text style={styles.greeting}>Hello, {fullName}</Text>
         <TouchableOpacity onPress={() => router.push("/Profile")} style={styles.profileWrapper}>
-          <Image source={userImage} style={styles.profileIcon} />
-          <Ionicons name="person" size={24} color="white" style={styles.profileIconOverlay} />
+          <View style={styles.profileInnerWrapper}>
+            <Image
+              source={userImage}
+              style={styles.profileIcon}
+              onLoad={() => setProfileReady(true)}
+              onError={() => setProfileReady(true)}
+            />
+            {profileReady && (
+              <Ionicons
+                name="person"
+                size={24}
+                color="white"
+                style={styles.profileIconOverlay}
+              />
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
-      {/* Main Content (Placeholders for Future Features) */}
+      {/* Main Content */}
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Your Upcoming Events</Text>
-        {/* TODO: Add event cards here */}
-
         <Text style={styles.sectionTitle}>Events Near You</Text>
-        {/* TODO: Add map/list of nearby events */}
       </View>
 
       {/* Bottom Navigation Bar */}
       <View style={styles.bottomNav}>
-        {/* Home Icon */}
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Home")}>
           <Ionicons name="home" size={35} color="#1877F2" />
         </TouchableOpacity>
-
-        {/* Plus Icon (Already Implemented) */}
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Plus")}>
           <Ionicons name="add-circle" size={35} color="#1877F2" />
         </TouchableOpacity>
-
-         {/* Search Icon */}
-         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
           <Ionicons name="search" size={35} color="#000000" />
         </TouchableOpacity>
-
-        {/* My Groups Icon */}
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/MyGroups")}>
           <Ionicons name="people" size={35} color="#1877F2" />
         </TouchableOpacity>
-
-        {/* Settings Icon */}
         <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Settings")}>
           <Ionicons name="settings" size={35} color="#1877F2" />
         </TouchableOpacity>
       </View>
-
-
     </View>
   );
 }
@@ -105,9 +108,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
-    backgroundColor: "#1877F2", // Blue header
-    paddingTop: 60, // Moves the header down (Adjust as needed)
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: "#1877F2",
+    minHeight: 120,
   },
   greeting: {
     fontSize: 22,
@@ -134,7 +139,7 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: "center",
     justifyContent: "center",
-    flex: 1, // Makes icons evenly spaced
+    flex: 1,
   },
   navText: {
     fontSize: 16,
@@ -142,22 +147,31 @@ const styles = StyleSheet.create({
     color: "#1877F2",
   },
   profileWrapper: {
-    position: "relative",
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#ddd",
+    overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
+  },
+  profileInnerWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: "hidden",
+    position: "relative",
   },
   profileIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#ddd",
+    resizeMode: "cover",
+    backgroundColor: "#ccc",
   },
   profileIconOverlay: {
     position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -12 }, { translateY: -12 }], // Centers the icon
+    top: 8,
+    left: 8,
   },
 });
