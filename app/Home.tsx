@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../app/firebaseConfig";
+import BottomNav from "../components/BottomNav";
 
 import React from "react";
 import {
@@ -76,25 +77,7 @@ export default function HomeScreen() {
         <Text style={styles.sectionTitle}>Your Upcoming Events</Text>
         <Text style={styles.sectionTitle}>Events Near You</Text>
       </View>
-
-      {/* Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Home")}>
-          <Ionicons name="home" size={35} color="#1877F2" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Plus")}>
-          <Ionicons name="add-circle" size={35} color="#1877F2" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
-          <Ionicons name="search" size={35} color="#000000" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/MyGroups")}>
-          <Ionicons name="people" size={35} color="#1877F2" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Settings")}>
-          <Ionicons name="settings" size={35} color="#1877F2" />
-        </TouchableOpacity>
-      </View>
+      <BottomNav />
     </View>
   );
 }

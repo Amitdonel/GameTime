@@ -14,6 +14,7 @@ import { collection, addDoc, Timestamp } from "firebase/firestore";
 import MapView from "react-native-maps";
 import * as Location from "expo-location";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import BottomNav from "../components/BottomNav";
 
 export default function PlusScreen() {
   const router = useRouter();
@@ -79,66 +80,71 @@ export default function PlusScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Create New Event</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Event Name"
-        placeholderTextColor="#aaa"
-        value={eventName}
-        onChangeText={setEventName}
-      />
-
-      <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
-        <Text style={{ color: "#000" }}>{eventDate.toDateString()}</Text>
-      </TouchableOpacity>
-
-      {showDatePicker && (
-        <View style={styles.datePickerContainer}>
-          <DateTimePicker
-            value={eventDate}
-            mode="date"
-            display="spinner"
-            onChange={(event, selectedDate) => {
-              if (selectedDate) setEventDate(selectedDate);
+    <View style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Create New Event</Text>
+  
+        <TextInput
+          style={styles.input}
+          placeholder="Event Name"
+          placeholderTextColor="#aaa"
+          value={eventName}
+          onChangeText={setEventName}
+        />
+  
+        <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+          <Text style={{ color: "#000" }}>{eventDate.toDateString()}</Text>
+        </TouchableOpacity>
+  
+        {showDatePicker && (
+          <View style={styles.datePickerContainer}>
+            <DateTimePicker
+              value={eventDate}
+              mode="date"
+              display="spinner"
+              onChange={(event, selectedDate) => {
+                if (selectedDate) setEventDate(selectedDate);
+              }}
+            />
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => setShowDatePicker(false)}
+            >
+              <Text style={styles.confirmButtonText}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+  
+        <Text style={styles.mapLabel}>Select Event Location:</Text>
+  
+        <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
+          <MapView
+            style={{ flex: 1 }}
+            region={region}
+            onRegionChangeComplete={(newRegion) => {
+              if (!newRegion?.latitude || !newRegion?.longitude) return;
+              setRegion(newRegion);
+              setSelectedLocation({
+                latitude: newRegion.latitude,
+                longitude: newRegion.longitude,
+              });
             }}
           />
-          <TouchableOpacity
-            style={styles.confirmButton}
-            onPress={() => setShowDatePicker(false)}
-          >
-            <Text style={styles.confirmButtonText}>Confirm</Text>
-          </TouchableOpacity>
+          <View style={styles.pinContainer}>
+            <Ionicons name="location-sharp" size={40} color="red" />
+          </View>
         </View>
-      )}
-
-      <Text style={styles.mapLabel}>Select Event Location:</Text>
-
-      <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
-        <MapView
-          style={{ flex: 1 }}
-          region={region}
-          onRegionChangeComplete={(newRegion) => {
-            if (!newRegion?.latitude || !newRegion?.longitude) return;
-            setRegion(newRegion);
-            setSelectedLocation({
-              latitude: newRegion.latitude,
-              longitude: newRegion.longitude,
-            });
-          }}
-        />
-        <View style={styles.pinContainer}>
-          <Ionicons name="location-sharp" size={40} color="red" />
-        </View>
+  
+        <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
+          <Text style={styles.createButtonText}>Create Event</Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
-        <Text style={styles.createButtonText}>Create Event</Text>
-      </TouchableOpacity>
+  
+      {/* Bottom Navigation Always Stays at Bottom */}
+      <BottomNav />
     </View>
   );
-}
+}  
 
 const styles = StyleSheet.create({
   container: {

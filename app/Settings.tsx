@@ -1,14 +1,17 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import BottomNav from "../components/BottomNav";
 
 export default function SettingsScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>Settings Screen (Coming Soon)</Text>
+    <View style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <Text style={styles.text}>Settings Screen (Coming Soon)</Text>
+      </View>
+      <BottomNav />
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

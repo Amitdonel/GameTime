@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import BottomNav from "../components/BottomNav";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -37,25 +38,7 @@ export default function ProfileScreen() {
       >
         <Text style={styles.editSurveyText}>Edit My Survey</Text>
       </TouchableOpacity>
-
-      {/* Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Home")}>
-          <Ionicons name="home" size={35} color="#1877F2" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Plus")}>
-          <Ionicons name="add-circle" size={35} color="#1877F2" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
-          <Ionicons name="search" size={35} color="#000000" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/MyGroups")}>
-          <Ionicons name="people" size={35} color="#1877F2" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Settings")}>
-          <Ionicons name="settings" size={35} color="#1877F2" />
-        </TouchableOpacity>
-      </View>
+      <BottomNav />
     </View>
   );
 }
