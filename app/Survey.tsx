@@ -1,437 +1,445 @@
-import { db } from "../app/firebaseConfig"; // Adjust path if needed
+import { db } from "../app/firebaseConfig";
 import { getAuth } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
-import {
-    Text,
-    View,
-    TouchableOpacity,
-    StyleSheet,
-    ScrollView,
-    ImageBackground,
-    Alert
-} from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Slider from "@react-native-community/slider";
+import {
+  Text,
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  ImageBackground,
+  Alert,
+} from "react-native";
 
-// Import the background image (same as Login page)
 const backgroundImage = require("../assets/images/soccer.jpg");
 
-import { useLocalSearchParams } from "expo-router";
 export default function SurveyScreen() {
-    const router = useRouter();
-    const { from } = useLocalSearchParams();
+  const router = useRouter();
+  const { from } = useLocalSearchParams();
 
+  const [positions, setPositions] = useState<string[]>([]);
+  const [skillLevel, setSkillLevel] = useState("");
+  const [stamina, setStamina] = useState("");
+  const [fieldType, setFieldType] = useState("");
+  const [playFrequency, setPlayFrequency] = useState("");
+  const [dob, setDob] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDob, setTempDob] = useState(new Date());
+  const [playRadius, setPlayRadius] = useState(10);
+  const [location, setLocation] = useState({
+    latitude: 32.0853,
+    longitude: 34.7818,
+  });
 
-    // State for selected answers
-    const [positions, setPositions] = useState<string[]>([]);
-    const [skillLevel, setSkillLevel] = useState("");
-    const [stamina, setStamina] = useState("");
-    const [fieldType, setFieldType] = useState("");
-    const [playFrequency, setPlayFrequency] = useState("");
-    const [dob, setDob] = useState(new Date());
-    const [showDatePicker, setShowDatePicker] = useState(false);
-    const [tempDob, setTempDob] = useState(new Date()); // Temp value before confirmation
-    const [playRadius, setPlayRadius] = useState(10);
-    const [location, setLocation] = useState({
-        latitude: 32.0853, // Default location (e.g., Tel Aviv)
-        longitude: 34.7818,
-    });
+  const [region, setRegion] = useState({
+    latitude: 32.0853,
+    longitude: 34.7818,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
 
-    const telAvivCoords = {
-        latitude: 32.0853,
-        longitude: 34.7818,
-    };
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Map will use default location (Tel Aviv).");
+        return;
+      }
 
-    const [region, setRegion] = useState({
-        latitude: 32.0853, // Tel Aviv
-        longitude: 34.7818,
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = currentLocation.coords;
+
+      setRegion({
+        latitude,
+        longitude,
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
-    });
+      });
 
+      setLocation({ latitude, longitude });
+    })();
+  }, []);
 
+  useEffect(() => {
+    const fetchSurveyData = async () => {
+      const user = getAuth().currentUser;
+      if (!user) return;
 
-    useEffect(() => {
-        (async () => {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== "granted") {
-            Alert.alert("Permission Denied", "Map will use default location (Tel Aviv).");
-            return;
-          }
-      
-          const currentLocation = await Location.getCurrentPositionAsync({});
-          const { latitude, longitude } = currentLocation.coords;
-      
-          setRegion({
-            latitude,
-            longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          });
-      
-          setLocation({ latitude, longitude }); // Keep your marker in sync
-        })();
-      }, []);
-      
+      const docRef = doc(db, "surveys", user.uid);
+      const docSnap = await getDoc(docRef);
 
-
-
-
-    // ✅ Keep this exactly as is:
-    const togglePosition = (role: string) => {
-        setPositions((prevPositions) =>
-            prevPositions.includes(role)
-                ? prevPositions.filter((item) => item !== role)
-                : [...prevPositions, role]
-        );
-    };
-
-
-    const handleSubmit = async () => {
-        if (positions.length === 0 || !skillLevel || !stamina || !fieldType || !playFrequency || !playRadius) {
-            Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
-            return;
-        }
-
-        const user = getAuth().currentUser;
-
-        if (!user) {
-            Alert.alert("Error", "User not authenticated");
-            return;
-        }
-        if (!location) {
-            Alert.alert("Missing Location", "Please select your location on the map.");
-            return;
-        }
-        try {
-            // Write the survey data to Firestore under the user's UID
-            await setDoc(doc(db, "surveys", user.uid), {
-                positions,
-                skillLevel,
-                stamina,
-                fieldType,
-                playFrequency,
-                playRadius,
-                dob: dob.toISOString(),
-                location, // includes lat + long
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setPositions(data.positions || []);
+        setSkillLevel(data.skillLevel || "");
+        setStamina(data.stamina || "");
+        setFieldType(data.fieldType || "");
+        setPlayFrequency(data.playFrequency || "");
+        setDob(data.dob ? new Date(data.dob) : new Date());
+        setPlayRadius(data.playRadius || 10);
+        if (data.location) {
+            setLocation(data.location);
+            setRegion({
+              ...data.location,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
             });
-
-            Alert.alert("Success", "Survey submitted successfully!", [
-                {
-                  text: "OK",
-                  onPress: () => {
-                    if (from === "profile") {
-                      router.push("/Profile");
-                    } else {
-                      router.push("/Login"); // default for new users
-                    }
-                  },
-                },
-              ]);
-        } catch (error: any) {
-            Alert.alert("Error", error.message || "An error occurred while saving survey.");
-        }
+          }          
+      }
     };
 
+    fetchSurveyData();
+  }, []);
 
-    return (
-        <ImageBackground source={backgroundImage} style={styles.background}>
-            <ScrollView contentContainerStyle={styles.container}>
-
-                {/* Back Button Positioned to the Left of "Player Survey" */}
-                <View style={styles.headerContainer}>
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.push("/SignUp")}>
-                        <Text style={styles.backArrow}>←</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.title}>Player Survey</Text>
-                </View>
-
-                {/* Question 6: Date of Birth */}
-                <View style={styles.questionBox}>
-                    <Text style={styles.question}>What is your Date of Birth?</Text>
-                </View>
-                <TouchableOpacity style={styles.datePicker} onPress={() => setShowDatePicker(true)}>
-                    <Text style={styles.optionText}>{dob.toDateString()}</Text>
-                </TouchableOpacity>
-
-                {/* Date Picker Modal */}
-                {showDatePicker && (
-                    <View style={styles.datePickerContainer}>
-                        <DateTimePicker
-                            value={tempDob}
-                            mode="date"
-                            display="spinner"
-                            minimumDate={new Date(1900, 0, 1)}
-                            maximumDate={new Date()}
-                            onChange={(event, selectedDate) => {
-                                if (selectedDate) setTempDob(selectedDate);
-                            }}
-                        />
-                        <TouchableOpacity
-                            style={styles.confirmButton}
-                            onPress={() => {
-                                setDob(tempDob);
-                                setShowDatePicker(false);
-                            }}
-                        >
-                            <Text style={styles.confirmButtonText}>Confirm</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* Question: Preferred Match Search Radius */}
-                <View style={styles.questionBox}>
-                    <Text style={styles.question}>Select your preferred match search radius (km)</Text>
-                </View>
-                <View style={styles.sliderContainer}>
-                    <Text style={styles.sliderValue}>{playRadius} km</Text>
-                    <Slider
-                        style={styles.slider}
-                        minimumValue={5}
-                        maximumValue={50}
-                        step={5}
-                        value={playRadius}
-                        onValueChange={(value) => setPlayRadius(value)}
-                        minimumTrackTintColor="#1877F2"
-                        maximumTrackTintColor="#ddd"
-                        thumbTintColor="#1877F2"
-                    />
-                </View>
-
-
-                {/* Question 1: Multi-Choice Position Selection */}
-                <View style={styles.questionBox}>
-                    <Text style={styles.question}>Which position would you like to play? (Select multiple)</Text>
-                </View>
-                {["Goalkeeper", "Defender", "Midfielder", "Attacker"].map((role) => (
-                    <TouchableOpacity
-                        key={role}
-                        style={[styles.option, positions.includes(role) && styles.selectedOption]}
-                        onPress={() => togglePosition(role)}
-                    >
-                        <Text style={styles.optionText}>{role}</Text>
-                    </TouchableOpacity>
-                ))}
-
-                {/* Question 2: Skill Level */}
-                <View style={styles.questionBox}>
-                    <Text style={styles.question}>What is your skill level (1-5)?</Text>
-                </View>
-                {["Beginner ⭐", "Average ⭐⭐", "Intermediate ⭐⭐⭐", "Advanced ⭐⭐⭐⭐", "Professional ⭐⭐⭐⭐⭐"].map((level) => (
-                    <TouchableOpacity
-                        key={level}
-                        style={[styles.option, skillLevel === level && styles.selectedOption]}
-                        onPress={() => setSkillLevel(level)}
-                    >
-                        <Text style={styles.optionText}>{level}</Text>
-                    </TouchableOpacity>
-                ))}
-
-                {/* Question 3: Stamina */}
-                <View style={styles.questionBox}>
-                    <Text style={styles.question}>How would you describe your stamina and athleticism?</Text>
-                </View>
-                {["Low", "Medium", "High"].map((level) => (
-                    <TouchableOpacity
-                        key={level}
-                        style={[styles.option, stamina === level && styles.selectedOption]}
-                        onPress={() => setStamina(level)}
-                    >
-                        <Text style={styles.optionText}>{level}</Text>
-                    </TouchableOpacity>
-                ))}
-
-                {/* Question 4: Field Type */}
-                <View style={styles.questionBox}>
-                    <Text style={styles.question}>What type of field do you prefer to play on?</Text>
-                </View>
-                {["Grass", "Asphalt", "No preference"].map((type) => (
-                    <TouchableOpacity
-                        key={type}
-                        style={[styles.option, fieldType === type && styles.selectedOption]}
-                        onPress={() => setFieldType(type)}
-                    >
-                        <Text style={styles.optionText}>{type}</Text>
-                    </TouchableOpacity>
-                ))}
-
-                {/* Question 5: Play Frequency */}
-                <View style={styles.questionBox}>
-                    <Text style={styles.question}>How often do you play football?</Text>
-                </View>
-                {["Rarely (Only in video games)", "Occasionally (Once or twice a month)", "Regularly (Weekly or more)", "Frequently (Multiple times per week)"].map((freq) => (
-                    <TouchableOpacity
-                        key={freq}
-                        style={[styles.option, playFrequency === freq && styles.selectedOption]}
-                        onPress={() => setPlayFrequency(freq)}
-                    >
-                        <Text style={styles.optionText}>{freq}</Text>
-                    </TouchableOpacity>
-                ))}
-
-                <View style={styles.questionBox}>
-                    <Text style={styles.question}>Insert your location</Text>
-                </View>
-
-                {location && (
-                    <View style={{ width: "90%", height: 300, marginVertical: 20 }}>
-                        <MapView
-                            style={{ flex: 1 }}
-                            region={region}
-                            onRegionChangeComplete={(newRegion) => setRegion(newRegion)} // Optional: track user pan/zoom
-                        >
-                            <Marker
-                                coordinate={region}
-                                pinColor="red"
-                            />
-                        </MapView>
-                    </View>
-                )}
-
-
-
-                {/* Submit Button */}
-                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-                    <Text style={styles.submitButtonText}>Submit</Text>
-                </TouchableOpacity>
-            </ScrollView>
-        </ImageBackground>
+  const togglePosition = (role: string) => {
+    setPositions((prevPositions) =>
+      prevPositions.includes(role)
+        ? prevPositions.filter((item) => item !== role)
+        : [...prevPositions, role]
     );
+  };
+
+  const handleSubmit = async () => {
+    if (positions.length === 0 || !skillLevel || !stamina || !fieldType || !playFrequency || !playRadius) {
+      Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
+      return;
+    }
+
+    const user = getAuth().currentUser;
+
+    if (!user) {
+      Alert.alert("Error", "User not authenticated");
+      return;
+    }
+
+    try {
+      await setDoc(doc(db, "surveys", user.uid), {
+        positions,
+        skillLevel,
+        stamina,
+        fieldType,
+        playFrequency,
+        playRadius,
+        dob: dob.toISOString(),
+        location,
+      });
+
+      Alert.alert("Success", "Survey submitted successfully!", [
+        {
+          text: "OK",
+          onPress: () => {
+            if (from === "profile") {
+              router.push("/Profile");
+            } else {
+              router.push("/Login");
+            }
+          },
+        },
+      ]);
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "An error occurred while saving survey.");
+    }
+  };
+
+  return (
+    <ImageBackground source={backgroundImage} style={styles.background}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Header with Back Button and Title */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.push(from === "profile" ? "/Profile" : "/SignUp")}
+          >
+            <Text style={styles.backArrow}>←</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <Text style={styles.title}>Player Survey</Text>
+          </View>
+        </View>
+
+        {/* Date of Birth */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>What is your Date of Birth?</Text>
+        </View>
+        <TouchableOpacity style={styles.datePicker} onPress={() => setShowDatePicker(true)}>
+          <Text style={styles.optionText}>{dob.toDateString()}</Text>
+        </TouchableOpacity>
+
+        {showDatePicker && (
+          <View style={styles.datePickerContainer}>
+            <DateTimePicker
+              value={tempDob}
+              mode="date"
+              display="spinner"
+              minimumDate={new Date(1900, 0, 1)}
+              maximumDate={new Date()}
+              onChange={(event, selectedDate) => {
+                if (selectedDate) setTempDob(selectedDate);
+              }}
+            />
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => {
+                setDob(tempDob);
+                setShowDatePicker(false);
+              }}
+            >
+              <Text style={styles.confirmButtonText}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Match Radius */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>Select your preferred match search radius (km)</Text>
+        </View>
+        <View style={styles.sliderContainer}>
+          <Text style={styles.sliderValue}>{playRadius} km</Text>
+          <Slider
+            style={styles.slider}
+            minimumValue={5}
+            maximumValue={50}
+            step={5}
+            value={playRadius}
+            onValueChange={(value) => setPlayRadius(value)}
+            minimumTrackTintColor="#1877F2"
+            maximumTrackTintColor="#ddd"
+            thumbTintColor="#1877F2"
+          />
+        </View>
+
+        {/* Positions */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>Which position would you like to play? (Select multiple)</Text>
+        </View>
+        {["Goalkeeper", "Defender", "Midfielder", "Attacker"].map((role) => (
+          <TouchableOpacity
+            key={role}
+            style={[styles.option, positions.includes(role) && styles.selectedOption]}
+            onPress={() => togglePosition(role)}
+          >
+            <Text style={styles.optionText}>{role}</Text>
+          </TouchableOpacity>
+        ))}
+
+        {/* Skill Level */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>What is your skill level (1-5)?</Text>
+        </View>
+        {["Beginner ⭐", "Average ⭐⭐", "Intermediate ⭐⭐⭐", "Advanced ⭐⭐⭐⭐", "Professional ⭐⭐⭐⭐⭐"].map((level) => (
+          <TouchableOpacity
+            key={level}
+            style={[styles.option, skillLevel === level && styles.selectedOption]}
+            onPress={() => setSkillLevel(level)}
+          >
+            <Text style={styles.optionText}>{level}</Text>
+          </TouchableOpacity>
+        ))}
+
+        {/* Stamina */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>How would you describe your stamina and athleticism?</Text>
+        </View>
+        {["Low", "Medium", "High"].map((level) => (
+          <TouchableOpacity
+            key={level}
+            style={[styles.option, stamina === level && styles.selectedOption]}
+            onPress={() => setStamina(level)}
+          >
+            <Text style={styles.optionText}>{level}</Text>
+          </TouchableOpacity>
+        ))}
+
+        {/* Field Type */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>What type of field do you prefer to play on?</Text>
+        </View>
+        {["Grass", "Asphalt", "No preference"].map((type) => (
+          <TouchableOpacity
+            key={type}
+            style={[styles.option, fieldType === type && styles.selectedOption]}
+            onPress={() => setFieldType(type)}
+          >
+            <Text style={styles.optionText}>{type}</Text>
+          </TouchableOpacity>
+        ))}
+
+        {/* Play Frequency */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>How often do you play football?</Text>
+        </View>
+        {[
+          "Rarely (Only in video games)",
+          "Occasionally (Once or twice a month)",
+          "Regularly (Weekly or more)",
+          "Frequently (Multiple times per week)",
+        ].map((freq) => (
+          <TouchableOpacity
+            key={freq}
+            style={[styles.option, playFrequency === freq && styles.selectedOption]}
+            onPress={() => setPlayFrequency(freq)}
+          >
+            <Text style={styles.optionText}>{freq}</Text>
+          </TouchableOpacity>
+        ))}
+
+        {/* Location */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>Insert your location</Text>
+        </View>
+
+        {location && (
+          <View style={{ width: "90%", height: 300, marginVertical: 20 }}>
+            <MapView
+              style={{ flex: 1 }}
+              region={region}
+              onRegionChangeComplete={(newRegion) => {
+                setRegion(newRegion);
+                setLocation({
+                  latitude: newRegion.latitude,
+                  longitude: newRegion.longitude,
+                });
+              }}              
+            >
+              <Marker coordinate={region} pinColor="red" />
+            </MapView>
+          </View>
+        )}
+
+        {/* Submit */}
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>Submit</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </ImageBackground>
+  );
 }
 
 const styles = StyleSheet.create({
-    background: {
-        flex: 1,
-        resizeMode: "cover",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    container: {
-        flexGrow: 1, // ✅ Ensures scrolling works properly
-        paddingBottom: 80, // ✅ Extra space so Submit button isn't cut off
-        alignItems: "center",
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: "bold",
-        color: "white",
-        marginTop: 70, // ✅ Prevents title from being cut off
-        marginBottom: 20,
-        textAlign: "center",
-    },
-    questionBox: {
-        width: "90%",
-        padding: 15,
-        backgroundColor: "black",
-        borderRadius: 10,
-        marginTop: 15,
-    },
-    question: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "white",
-        textAlign: "center",
-    },
-    datePicker: {
-        width: "90%",
-        padding: 15,
-        backgroundColor: "white",
-        borderRadius: 10,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#ddd",
-    },
-    datePickerContainer: {
-        backgroundColor: "white",
-        padding: 20,
-        borderRadius: 10,
-        alignItems: "center",
-        width: "90%",
-        marginVertical: 10,
-    },
-    confirmButton: {
-        marginTop: 10,
-        backgroundColor: "#1877F2",
-        paddingVertical: 10,
-        paddingHorizontal: 30,
-        borderRadius: 10,
-    },
-    confirmButtonText: {
-        color: "white",
-        fontSize: 16,
-        fontWeight: "bold",
-    },
-    submitButton: {
-        backgroundColor: "#1877F2",
-        padding: 15,
-        borderRadius: 10,
-        width: "90%",
-        alignItems: "center",
-        marginTop: 20,
-    },
-    submitButtonText: {
-        color: "white",
-        fontSize: 18,
-        fontWeight: "bold",
-    },
-    option: {
-        width: "90%",
-        padding: 15,
-        backgroundColor: "white",
-        borderRadius: 10,
-        marginVertical: 5,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#ddd",
-    },
-    selectedOption: {
-        backgroundColor: "#1877F2",
-    },
-    optionText: {
-        fontSize: 16,
-        color: "#333",  // 🔥 Fix: Added optionText style
-    },
-    sliderContainer: {
-        width: "90%",
-        alignItems: "center",
-        marginVertical: 20,
-    },
-    slider: {
-        width: "100%",
-        height: 40,
-    },
-    sliderValue: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "white",
-        marginBottom: 10,
-    },
-    headerContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        width: "90%",
-        marginTop: 50, // Ensures it's fully visible
-        marginBottom: 20,
-    },
-    backButton: {
-        marginRight: 50, // Adds spacing between arrow & title
-    },
-    backArrow: {
-        marginTop: -40,
-        marginLeft: -20,
-        fontSize: 30,
-        color: "white",
-        fontWeight: "bold",
-    },
-    pinContainer: {
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: [{ translateX: -18 }, { translateY: -36 }],
-        zIndex: 999,
-    },
+  background: {
+    flex: 1,
+    resizeMode: "cover",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  container: {
+    flexGrow: 1,
+    paddingBottom: 80,
+    alignItems: "center",
+  },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    width: "90%",
+    marginTop: 50,
+    marginBottom: 20,
+  },
+  backButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  backArrow: {
+    fontSize: 30,
+    color: "white",
+    fontWeight: "bold",
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "white",
+  },
+  questionBox: {
+    width: "90%",
+    padding: 15,
+    backgroundColor: "black",
+    borderRadius: 10,
+    marginTop: 15,
+  },
+  question: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "white",
+    textAlign: "center",
+  },
+  datePicker: {
+    width: "90%",
+    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  datePickerContainer: {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    width: "90%",
+    marginVertical: 10,
+  },
+  confirmButton: {
+    marginTop: 10,
+    backgroundColor: "#1877F2",
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+  },
+  confirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  submitButton: {
+    backgroundColor: "#1877F2",
+    padding: 15,
+    borderRadius: 10,
+    width: "90%",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  submitButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  option: {
+    width: "90%",
+    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 10,
+    marginVertical: 5,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  selectedOption: {
+    backgroundColor: "#1877F2",
+  },
+  optionText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  sliderContainer: {
+    width: "90%",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  slider: {
+    width: "100%",
+    height: 40,
+  },
+  sliderValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "white",
+    marginBottom: 10,
+  },
 });

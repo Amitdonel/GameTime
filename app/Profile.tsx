@@ -1,40 +1,46 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { getAuth } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../app/firebaseConfig";
 import BottomNav from "../components/BottomNav";
 
 export default function ProfileScreen() {
   const router = useRouter();
-
-  // Anonymous placeholder image
+  const [userName, setUserName] = useState("Loading...");
   const anonymousImage = { uri: "https://via.placeholder.com/100" };
+
+  useEffect(() => {
+    const fetchUserName = async () => {
+      const user = getAuth().currentUser;
+      if (user) {
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUserName(docSnap.data().name || "Player");
+        }
+      }
+    };
+    fetchUserName();
+  }, []);
 
   return (
     <View style={styles.container}>
       {/* Profile Avatar */}
       <View style={styles.avatarWrapper}>
         <Image source={anonymousImage} style={styles.avatar} />
-        <Ionicons
-          name="person"
-          size={24}
-          color="white"
-          style={styles.avatarOverlay}
-        />
+        <Ionicons name="person" size={24} color="white" style={styles.avatarOverlay} />
       </View>
 
-      {/* User Info */}
-      <Text style={styles.title}>Anonymous Player</Text>
-
-      {/* TODO: Add image upload here later */}
+      <Text style={styles.title}>{userName}</Text>
       <Text style={styles.todo}>TODO: Add profile image upload</Text>
 
       {/* Edit Survey Button */}
       <TouchableOpacity
         style={styles.editSurveyButton}
-        onPress={() =>
-          router.push({ pathname: "/Survey", params: { from: "profile" } })
-        }
+        onPress={() => router.push({ pathname: "/Survey", params: { from: "profile" } })}
       >
         <Text style={styles.editSurveyText}>Edit My Survey</Text>
       </TouchableOpacity>
@@ -42,6 +48,9 @@ export default function ProfileScreen() {
     </View>
   );
 }
+
+// styles same as your current Profile.tsx
+
 
 const styles = StyleSheet.create({
   container: {
