@@ -7,42 +7,59 @@ import {
   TouchableOpacity,
   ImageBackground,
   StyleSheet,
+  Alert,
 } from "react-native";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "../app/firebaseConfig";
 
-// Import background image (same as Login page)
+// Background image
 const soccerImage = require("../assets/images/soccer.jpg");
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
 
-  const handleReset = () => {
-    console.log("Password reset requested for:", email);
-    // TODO: Implement password reset logic with database
-    alert("Password reset instructions sent to " + email);
+  const handleReset = async () => {
+    if (!email) {
+      Alert.alert("Missing Info", "Please enter your email address.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      Alert.alert(
+        "Reset Email Sent",
+        "Check your inbox for password reset instructions.",
+        [{ text: "OK", onPress: () => router.push("/Login") }]
+      );
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Something went wrong.");
+    }
   };
 
   return (
     <ImageBackground source={soccerImage} style={styles.background}>
       <View style={styles.overlay}>
         <Text style={styles.title}>Forgot Password</Text>
-        
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
             placeholder="Enter your email"
             placeholderTextColor="#aaa"
+            keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
           />
-          
+
           <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
             <Text style={styles.resetButtonText}>Send Reset Instructions</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Back to Login */}
-        <TouchableOpacity style={styles.backButton} onPress={() => router.push("/Login")}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.push("/Login")}
+        >
           <Text style={styles.backButtonText}>Back to Login</Text>
         </TouchableOpacity>
       </View>
