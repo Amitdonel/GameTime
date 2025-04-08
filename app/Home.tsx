@@ -23,7 +23,6 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let isMounted = true;
-
     const fetchUserData = async () => {
       const user = getAuth().currentUser;
       if (user) {
