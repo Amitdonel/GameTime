@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -39,6 +40,7 @@ export default function PlusScreen() {
   const [maxPlayers, setMaxPlayers] = useState(10);
   const [gameMethod, setGameMethod] = useState("Match Making");
   const [description, setDescription] = useState("");
+  const [selectedImage, setSelectedImage] = useState("soccer.jpg");
 
   useEffect(() => {
     (async () => {
@@ -78,7 +80,9 @@ export default function PlusScreen() {
         maxPlayers,
         gameMethod,
         description,
+        image: selectedImage,
         createdBy: getAuth().currentUser?.uid || null,
+        players: [getAuth().currentUser?.uid],
       });
 
       Alert.alert("Success", "Event created successfully!", [
@@ -170,6 +174,20 @@ export default function PlusScreen() {
             placeholderTextColor="#888"
           />
 
+          {/* Image Picker */}
+          <Text style={styles.label}>Choose Image:</Text>
+          <View style={styles.imageRow}>
+            <TouchableOpacity onPress={() => setSelectedImage("soccer.jpg")}>
+              <Image
+                source={require("../assets/images/soccer.jpg")}
+                style={[
+                  styles.thumbnail,
+                  selectedImage === "soccer.jpg" && styles.selectedThumbnail,
+                ]}
+              />
+            </TouchableOpacity>
+          </View>
+
           {/* Map Section */}
           <Text style={styles.mapLabel}>Select Event Location:</Text>
           <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
@@ -205,6 +223,7 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   container: {
+    paddingTop: 60,
     flex: 1,
     justifyContent: "flex-start",
     alignItems: "center",
@@ -307,5 +326,18 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: "#fff",
     textAlignVertical: "top",
+  },
+  imageRow: {
+    flexDirection: "row",
+    marginVertical: 10,
+  },
+  thumbnail: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+  },
+  selectedThumbnail: {
+    borderWidth: 3,
+    borderColor: "#1877F2",
   },
 });
