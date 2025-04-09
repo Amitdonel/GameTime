@@ -17,6 +17,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
+const imageMap: { [key: string]: any } = {
+  "soccer.jpg": require("../assets/images/soccer.jpg"),
+};
+
 export default function HomeScreen() {
   const [userImage, setUserImage] = useState({ uri: "https://via.placeholder.com/100" });
   const [fullName, setFullName] = useState("Player");
@@ -113,27 +117,34 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const renderEvent = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.eventCard}
-      onPress={() =>
-        router.push({
-          pathname: "/EventDetail",
-          params: { eventId: item.id },
-        })
-      }
-    >
-      <Text style={styles.eventTitle}>{item.name}</Text>
-      <Text style={styles.eventDetails}>
-        Date: {item.date ? new Date(item.date.seconds * 1000).toDateString() : "N/A"}
-      </Text>
-      <Text style={styles.eventDetails}>Max Players: {item.maxPlayers}</Text>
-      <Text style={styles.eventDetails}>Method: {item.gameMethod}</Text>
-      {item.description ? (
-        <Text style={styles.eventDesc}>{item.description}</Text>
-      ) : null}
-    </TouchableOpacity>
-  );
+  const renderEvent = ({ item }: { item: any }) => {
+    const confirmed = item.players?.length || 0;
+    const max = item.maxPlayers || 0;
+    const spotsLeft = max - confirmed;
+    const almostThere = spotsLeft >= 1 && spotsLeft <= 5;
+    const imgSrc = imageMap[item.image] || require("../assets/images/soccer.jpg");
+
+    return (
+      <TouchableOpacity
+        style={styles.eventCard}
+        onPress={() =>
+          router.push({
+            pathname: "/EventDetail",
+            params: { eventId: item.id },
+          })
+        }
+      >
+        <Image source={imgSrc} style={styles.eventImage} />
+        <Text style={styles.eventTitle}>{item.name}</Text>
+        <Text style={styles.eventInfo}>
+          {item.gameMethod} | {confirmed} / {max} players
+        </Text>
+        {almostThere && (
+          <Text style={styles.almostThere}>ALMOST THERE!</Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -236,24 +247,35 @@ const styles = StyleSheet.create({
   },
   eventCard: {
     backgroundColor: "white",
-    padding: 15,
     borderRadius: 10,
-    marginBottom: 10,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: "#ddd",
+    overflow: "hidden",
+  },
+  eventImage: {
+    width: "100%",
+    height: 160,
+    resizeMode: "cover",
   },
   eventTitle: {
     fontSize: 16,
     fontWeight: "bold",
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
-  eventDetails: {
+  eventInfo: {
     fontSize: 14,
+    paddingHorizontal: 12,
+    paddingBottom: 4,
     color: "#333",
   },
-  eventDesc: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 5,
+  almostThere: {
+    fontSize: 14,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    fontWeight: "bold",
+    color: "#e67e22",
   },
   profileWrapper: {
     width: 44,
