@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -15,6 +16,8 @@ import MapView from "react-native-maps";
 import * as Location from "expo-location";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNav from "../components/BottomNav";
+import Slider from "@react-native-community/slider";
+import { getAuth } from "firebase/auth";
 
 export default function PlusScreen() {
   const router = useRouter();
@@ -32,6 +35,10 @@ export default function PlusScreen() {
     latitude: 32.0853,
     longitude: 34.7818,
   });
+
+  const [maxPlayers, setMaxPlayers] = useState(10);
+  const [gameMethod, setGameMethod] = useState("Match Making");
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -68,6 +75,10 @@ export default function PlusScreen() {
         date: Timestamp.fromDate(eventDate),
         location: selectedLocation,
         createdAt: Timestamp.now(),
+        maxPlayers,
+        gameMethod,
+        description,
+        createdBy: getAuth().currentUser?.uid || null,
       });
 
       Alert.alert("Success", "Event created successfully!", [
@@ -81,75 +92,121 @@ export default function PlusScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Create New Event</Text>
-  
-        <TextInput
-          style={styles.input}
-          placeholder="Event Name"
-          placeholderTextColor="#aaa"
-          value={eventName}
-          onChangeText={setEventName}
-        />
-  
-        <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
-          <Text style={{ color: "#000" }}>{eventDate.toDateString()}</Text>
-        </TouchableOpacity>
-  
-        {showDatePicker && (
-          <View style={styles.datePickerContainer}>
-            <DateTimePicker
-              value={eventDate}
-              mode="date"
-              display="spinner"
-              onChange={(event, selectedDate) => {
-                if (selectedDate) setEventDate(selectedDate);
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.container}>
+          <Text style={styles.title}>Create New Event</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Event Name"
+            placeholderTextColor="#aaa"
+            value={eventName}
+            onChangeText={setEventName}
+          />
+
+          <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+            <Text style={{ color: "#000" }}>{eventDate.toDateString()}</Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <View style={styles.datePickerContainer}>
+              <DateTimePicker
+                value={eventDate}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) setEventDate(selectedDate);
+                }}
+              />
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Max Players */}
+          <Text style={styles.label}>Max Players: {maxPlayers}</Text>
+          <Slider
+            style={{ width: "100%", height: 40 }}
+            minimumValue={1}
+            maximumValue={50}
+            step={1}
+            value={maxPlayers}
+            onValueChange={setMaxPlayers}
+            minimumTrackTintColor="#1877F2"
+            maximumTrackTintColor="#ddd"
+            thumbTintColor="#1877F2"
+          />
+
+          {/* Game Method */}
+          <Text style={styles.label}>Game Method:</Text>
+          <View style={styles.radioContainer}>
+            {["Match Making", "Optimization"].map((method) => (
+              <TouchableOpacity
+                key={method}
+                style={[
+                  styles.radioButton,
+                  gameMethod === method && styles.radioButtonSelected,
+                ]}
+                onPress={() => setGameMethod(method)}
+              >
+                <Text style={styles.radioText}>{method}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Description */}
+          <Text style={styles.label}>Description:</Text>
+          <TextInput
+            style={styles.descriptionInput}
+            multiline
+            numberOfLines={4}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Write something about the match..."
+            placeholderTextColor="#888"
+          />
+
+          {/* Map Section */}
+          <Text style={styles.mapLabel}>Select Event Location:</Text>
+          <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
+            <MapView
+              style={{ flex: 1 }}
+              region={region}
+              onRegionChangeComplete={(newRegion) => {
+                if (!newRegion?.latitude || !newRegion?.longitude) return;
+                setRegion(newRegion);
+                setSelectedLocation({
+                  latitude: newRegion.latitude,
+                  longitude: newRegion.longitude,
+                });
               }}
             />
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={() => setShowDatePicker(false)}
-            >
-              <Text style={styles.confirmButtonText}>Confirm</Text>
-            </TouchableOpacity>
+            <View style={styles.pinContainer}>
+              <Ionicons name="location-sharp" size={40} color="red" />
+            </View>
           </View>
-        )}
-  
-        <Text style={styles.mapLabel}>Select Event Location:</Text>
-  
-        <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
-          <MapView
-            style={{ flex: 1 }}
-            region={region}
-            onRegionChangeComplete={(newRegion) => {
-              if (!newRegion?.latitude || !newRegion?.longitude) return;
-              setRegion(newRegion);
-              setSelectedLocation({
-                latitude: newRegion.latitude,
-                longitude: newRegion.longitude,
-              });
-            }}
-          />
-          <View style={styles.pinContainer}>
-            <Ionicons name="location-sharp" size={40} color="red" />
-          </View>
+
+          <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
+            <Text style={styles.createButtonText}>Create Event</Text>
+          </TouchableOpacity>
         </View>
-  
-        <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
-          <Text style={styles.createButtonText}>Create Event</Text>
-        </TouchableOpacity>
-      </View>
-  
-      {/* Bottom Navigation Always Stays at Bottom */}
+      </ScrollView>
       <BottomNav />
     </View>
   );
-}  
+}
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    paddingBottom: 120,
+  },
   container: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     padding: 20,
     backgroundColor: "#f5f5f5",
@@ -200,6 +257,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
+  mapLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    alignSelf: "flex-start",
+    marginTop: 10,
+  },
   pinContainer: {
     position: "absolute",
     top: "50%",
@@ -207,11 +271,41 @@ const styles = StyleSheet.create({
     transform: [{ translateX: -20 }, { translateY: -40 }],
     zIndex: 999,
   },
-  mapLabel: {
+  label: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#333",
     alignSelf: "flex-start",
     marginTop: 10,
+  },
+  radioContainer: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+  radioButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    marginRight: 10,
+  },
+  radioButtonSelected: {
+    backgroundColor: "#1877F2",
+    borderColor: "#1877F2",
+  },
+  radioText: {
+    color: "#000",
+    fontWeight: "bold",
+  },
+  descriptionInput: {
+    width: "100%",
+    minHeight: 100,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: "#fff",
+    textAlignVertical: "top",
   },
 });
