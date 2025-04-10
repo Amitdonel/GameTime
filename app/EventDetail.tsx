@@ -9,9 +9,10 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc } from "firebase/firestore";
 import { db } from "../app/firebaseConfig";
 import { getAuth } from "firebase/auth";
+import BottomNav from "../components/BottomNav";
 
 export default function EventDetailScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
@@ -109,6 +110,32 @@ export default function EventDetailScreen() {
     }
   };
 
+  const handleCancelEvent = async () => {
+    Alert.alert(
+      "Are you sure?",
+      "This will permanently delete the event.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const ref = doc(db, "events", eventId);
+              await deleteDoc(ref);
+              Alert.alert("Event deleted", "The event has been successfully canceled.");
+              router.push("/Home");
+            } catch (err) {
+              console.error("Error deleting event:", err);
+              Alert.alert("Error", "Could not delete the event.");
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -130,19 +157,24 @@ export default function EventDetailScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* Buttons for Edit Event and Cancel Event moved above the event title */}
       <View style={styles.header}>
-        <Text style={styles.title}>{event.name}</Text>
         {isManager && (
-          <TouchableOpacity onPress={() => router.push(`/EditEvent?eventId=${eventId}`)}>
-            <Text style={styles.editText}>Edit</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity onPress={() => router.push(`/EditEvent?eventId=${eventId}`)}>
+              <Text style={styles.editText}>Edit Event</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleCancelEvent}>
+              <Text style={[styles.editText, styles.cancelText]}>Cancel Event</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
 
+      <Text style={styles.title}>{event.name}</Text>
+
       <Text style={styles.label}>Date:</Text>
-      <Text style={styles.value}>
-        {new Date(event.date?.seconds * 1000).toDateString()}
-      </Text>
+      <Text style={styles.value}>{new Date(event.date?.seconds * 1000).toDateString()}</Text>
 
       <Text style={styles.label}>Game Method:</Text>
       <Text style={styles.value}>{event.gameMethod}</Text>
@@ -185,6 +217,8 @@ export default function EventDetailScreen() {
           <Text style={styles.buttonText}>Not Coming</Text>
         </TouchableOpacity>
       </View>
+
+      <BottomNav />
     </ScrollView>
   );
 }
@@ -195,6 +229,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: "#f5f5f5",
     flexGrow: 1,
+    paddingBottom: 100, // Remove this if not using BottomNav
   },
   loadingContainer: {
     flex: 1,
@@ -205,6 +240,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
@@ -216,6 +252,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#1877F2",
     textDecorationLine: "underline",
+  },
+  cancelText: {
+    color: "#dc3545",
   },
   label: {
     fontSize: 16,
