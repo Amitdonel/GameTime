@@ -21,7 +21,14 @@ import Slider from "@react-native-community/slider";
 import { getAuth } from "firebase/auth";
 
 export default function PlusScreen() {
+
   const router = useRouter();
+  const imageMap: { [key: string]: any } = {
+    "soccer.jpg": require("../assets/images/soccer.jpg"),
+    "soccer1.jpg": require("../assets/images/soccer1.jpg"),
+    "soccer2.jpg": require("../assets/images/soccer2.jpg"),
+    "soccer3.jpg": require("../assets/images/soccer3.jpg"),
+  };
 
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState(new Date());
@@ -176,17 +183,22 @@ export default function PlusScreen() {
 
           {/* Image Picker */}
           <Text style={styles.label}>Choose Image:</Text>
-          <View style={styles.imageRow}>
-            <TouchableOpacity onPress={() => setSelectedImage("soccer.jpg")}>
-              <Image
-                source={require("../assets/images/soccer.jpg")}
-                style={[
-                  styles.thumbnail,
-                  selectedImage === "soccer.jpg" && styles.selectedThumbnail,
-                ]}
-              />
-            </TouchableOpacity>
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
+            <View style={styles.imageRow}>
+              {["soccer.jpg", "soccer1.jpg", "soccer2.jpg", "soccer3.jpg"].map((img) => (
+                <TouchableOpacity key={img} onPress={() => setSelectedImage(img)} style={{ marginRight: 10 }}>
+                  <Image
+                    source={imageMap[img]}
+                    style={[
+                      styles.thumbnail,
+                      selectedImage === img && styles.selectedThumbnail,
+                    ]}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
 
           {/* Map Section */}
           <Text style={styles.mapLabel}>Select Event Location:</Text>

@@ -16,10 +16,17 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import MapView from "react-native-maps";
 import Slider from "@react-native-community/slider";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import BottomNav from "../components/BottomNav";
 
 export default function EditEventScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const router = useRouter();
+  const imageMap: { [key: string]: any } = {
+    "soccer.jpg": require("../assets/images/soccer.jpg"),
+    "soccer1.jpg": require("../assets/images/soccer1.jpg"),
+    "soccer2.jpg": require("../assets/images/soccer2.jpg"),
+    "soccer3.jpg": require("../assets/images/soccer3.jpg"),
+  };
 
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState<any>({});
@@ -166,15 +173,26 @@ export default function EditEventScreen() {
       />
 
       <Text style={styles.label}>Choose Image:</Text>
-      <TouchableOpacity onPress={() => setEventData({ ...eventData, image: "soccer.jpg" })}>
-        <Image
-          source={require("../assets/images/soccer.jpg")}
-          style={[
-            styles.thumbnail,
-            eventData.image === "soccer.jpg" && styles.selectedThumbnail,
-          ]}
-        />
-      </TouchableOpacity>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
+        <View style={{ flexDirection: "row" }}>
+          {["soccer.jpg", "soccer1.jpg", "soccer2.jpg", "soccer3.jpg"].map((img) => (
+            <TouchableOpacity
+              key={img}
+              onPress={() => setEventData({ ...eventData, image: img })}
+              style={{ marginRight: 10 }}
+            >
+              <Image
+                source={imageMap[img]}
+                style={[
+                  styles.thumbnail,
+                  eventData.image === img && styles.selectedThumbnail,
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
 
       <Text style={styles.label}>Event Location:</Text>
       <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
@@ -200,6 +218,7 @@ export default function EditEventScreen() {
           <Ionicons name="location-sharp" size={40} color="red" />
         </View>
       </View>
+      <BottomNav />
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save Changes</Text>
@@ -214,6 +233,12 @@ const styles = StyleSheet.create({
     paddingBottom: 150,
     paddingHorizontal: 20,
     backgroundColor: "#f5f5f5",
+  },
+  datePickerContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 10,
+    marginVertical: 10,
   },
   loadingContainer: {
     flex: 1,

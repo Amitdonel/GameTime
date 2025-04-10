@@ -17,8 +17,12 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
+// ✅ Image map for asset lookup
 const imageMap: { [key: string]: any } = {
   "soccer.jpg": require("../assets/images/soccer.jpg"),
+  "soccer1.jpg": require("../assets/images/soccer1.jpg"),
+  "soccer2.jpg": require("../assets/images/soccer2.jpg"),
+  "soccer3.jpg": require("../assets/images/soccer3.jpg"),
 };
 
 export default function HomeScreen() {
@@ -71,13 +75,11 @@ export default function HomeScreen() {
 
       const surveyRef = doc(db, "surveys", user.uid);
       const surveySnap = await getDoc(surveyRef);
-
       if (!surveySnap.exists()) return;
 
       const surveyData = surveySnap.data();
       const userLocation = surveyData.location;
       const playRadius = surveyData.playRadius;
-
       if (!userLocation || typeof userLocation.latitude !== "number") return;
 
       const eventSnap = await getDocs(collection(db, "events"));
@@ -122,7 +124,7 @@ export default function HomeScreen() {
     const max = item.maxPlayers || 0;
     const spotsLeft = max - confirmed;
     const almostThere = spotsLeft >= 1 && spotsLeft <= 5;
-    const imgSrc = imageMap[item.image] || require("../assets/images/soccer.jpg");
+    const imgSrc = imageMap[item.image] || imageMap["soccer.jpg"];
 
     return (
       <TouchableOpacity
@@ -275,7 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 10,
     fontWeight: "bold",
-    color: "#e67e22",
+    color: "#f44336",
   },
   profileWrapper: {
     width: 44,

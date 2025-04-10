@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { getAuth } from "firebase/auth";
+import { getAuth, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../app/firebaseConfig";
 import BottomNav from "../components/BottomNav";
@@ -26,6 +26,16 @@ export default function ProfileScreen() {
     fetchUserName();
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await signOut(getAuth());
+      router.push("/Login"); // Redirect to login page
+    } catch (error) {
+      console.error("Error signing out: ", error);
+      Alert.alert("Error", "Could not sign out. Please try again.");
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Profile Avatar */}
@@ -44,13 +54,16 @@ export default function ProfileScreen() {
       >
         <Text style={styles.editSurveyText}>Edit My Survey</Text>
       </TouchableOpacity>
+
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
+
       <BottomNav />
     </View>
   );
 }
-
-// styles same as your current Profile.tsx
-
 
 const styles = StyleSheet.create({
   container: {
@@ -98,6 +111,18 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   editSurveyText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  logoutButton: {
+    backgroundColor: "#dc3545",
+    paddingVertical: 15,
+    paddingHorizontal: 25,
+    borderRadius: 10,
+    marginBottom: 40,
+  },
+  logoutText: {
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
