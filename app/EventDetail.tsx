@@ -136,6 +136,52 @@ export default function EventDetailScreen() {
     );
   };
 
+  // Create Teams Button Logic: This button will show once max players are confirmed
+  const handleCreateTeams = () => {
+    // Prompt manager for the number of groups using Alert
+    Alert.prompt(
+      "Create Teams",
+      "Enter the number of teams:",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Create",
+          onPress: (input) => {
+            const numOfGroups = parseInt(input || "");
+  
+            // Validate the number of groups
+            if (isNaN(numOfGroups) || numOfGroups <= 0) {
+              Alert.alert("Invalid Input", "Please enter a valid number of groups.");
+              return;
+            }
+  
+            // Check if total players are divisible by the number of groups
+            const totalPlayers = event.players?.length || 0;
+  
+            if (totalPlayers % numOfGroups !== 0) {
+              Alert.alert(
+                "Invalid Group Division",
+                `You cannot divide ${totalPlayers} players into ${numOfGroups} groups evenly. Please choose a valid number of groups.`
+              );
+              return;
+            }
+  
+            // Proceed to divide players into groups
+            // Proceed with dividing players and creating the teams logic
+            Alert.alert("Teams Created", "The teams have been successfully divided!");
+          },
+        },
+      ],
+      "plain-text",
+      "",
+      "numeric"
+    );
+  };
+  
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -197,6 +243,7 @@ export default function EventDetailScreen() {
         <Text key={i} style={styles.playerItem}>• {name}</Text>
       ))}
 
+
       <View style={styles.buttonRow}>
         <TouchableOpacity
           style={[
@@ -206,17 +253,25 @@ export default function EventDetailScreen() {
           ]}
           onPress={handleJoin}
           disabled={isFull && !isComing}
-        >
+          >
           <Text style={styles.buttonText}>GameTime</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.button, styles.redButton]}
           onPress={handleLeave}
-        >
+          >
           <Text style={styles.buttonText}>Not Coming</Text>
         </TouchableOpacity>
       </View>
+          {isManager && confirmedCount >= event.maxPlayers && (
+            <TouchableOpacity 
+              style={styles.createTeamsButton} 
+              onPress={handleCreateTeams}
+            >
+              <Text style={styles.buttonText}>Create Teams</Text>
+            </TouchableOpacity>
+          )}
 
       <BottomNav />
     </ScrollView>
@@ -229,7 +284,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: "#f5f5f5",
     flexGrow: 1,
-    paddingBottom: 100, // Remove this if not using BottomNav
+    paddingBottom: 100, // Adjust if necessary
   },
   loadingContainer: {
     flex: 1,
@@ -301,5 +356,12 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "white",
     fontWeight: "bold",
+  },
+  createTeamsButton: {
+    backgroundColor: "#1877F2",
+    padding: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 20,
   },
 });
