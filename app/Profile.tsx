@@ -45,7 +45,7 @@ export default function ProfileScreen() {
       </View>
 
       <Text style={styles.title}>{userName}</Text>
-      <Text style={styles.todo}>TODO: Add profile image upload</Text>
+      
 
       {/* Edit Survey Button */}
       <TouchableOpacity

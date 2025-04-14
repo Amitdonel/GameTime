@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -9,7 +10,14 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+  deleteDoc,
+} from "firebase/firestore";
 import { db } from "../app/firebaseConfig";
 import { getAuth } from "firebase/auth";
 import BottomNav from "../components/BottomNav";
@@ -21,6 +29,7 @@ export default function EventDetailScreen() {
   const [isManager, setIsManager] = useState(false);
   const [isComing, setIsComing] = useState(false);
   const [playerNames, setPlayerNames] = useState<string[]>([]);
+  const [teams, setTeams] = useState<Record<string, string[]> | null>(null);
   const user = getAuth().currentUser;
   const router = useRouter();
 
@@ -35,6 +44,7 @@ export default function EventDetailScreen() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setEvent(data);
+          setTeams(data.teams || null);
           setIsManager(data.createdBy === user.uid);
           setIsComing((data.players || []).includes(user.uid));
 
@@ -44,11 +54,7 @@ export default function EventDetailScreen() {
           for (const uid of playerUids) {
             const userRef = doc(db, "users", uid);
             const userSnap = await getDoc(userRef);
-            if (userSnap.exists()) {
-              playerNameList.push(userSnap.data().name || uid);
-            } else {
-              playerNameList.push(uid);
-            }
+            playerNameList.push(userSnap.exists() ? userSnap.data().name || uid : uid);
           }
 
           setPlayerNames(playerNameList);
@@ -67,7 +73,6 @@ export default function EventDetailScreen() {
 
   const handleJoin = async () => {
     if (!eventId || !user) return;
-
     if ((event.players?.length || 0) >= event.maxPlayers && !isComing) {
       Alert.alert("Match is Full", "No more players can join.");
       return;
@@ -75,9 +80,7 @@ export default function EventDetailScreen() {
 
     try {
       const ref = doc(db, "events", eventId);
-      await updateDoc(ref, {
-        players: arrayUnion(user.uid),
-      });
+      await updateDoc(ref, { players: arrayUnion(user.uid) });
       setIsComing(true);
       setEvent((prev: any) => ({
         ...prev,
@@ -94,9 +97,7 @@ export default function EventDetailScreen() {
 
     try {
       const ref = doc(db, "events", eventId);
-      await updateDoc(ref, {
-        players: arrayRemove(user.uid),
-      });
+      await updateDoc(ref, { players: arrayRemove(user.uid) });
       setIsComing(false);
       setEvent((prev: any) => ({
         ...prev,
@@ -111,67 +112,107 @@ export default function EventDetailScreen() {
   };
 
   const handleCancelEvent = async () => {
-    Alert.alert(
-      "Are you sure?",
-      "This will permanently delete the event.",
+    Alert.alert("Are you sure?", "This will permanently delete the event.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const ref = doc(db, "events", eventId);
+            await deleteDoc(ref);
+            Alert.alert("Event deleted", "The event has been successfully canceled.");
+            router.push("/Home");
+          } catch (err) {
+            console.error("Error deleting event:", err);
+            Alert.alert("Error", "Could not delete the event.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleCreateTeams = async () => {
+    Alert.prompt(
+      "Create Teams",
+      "Enter number of teams:",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const ref = doc(db, "events", eventId);
-              await deleteDoc(ref);
-              Alert.alert("Event deleted", "The event has been successfully canceled.");
-              router.push("/Home");
-            } catch (err) {
-              console.error("Error deleting event:", err);
-              Alert.alert("Error", "Could not delete the event.");
-            }
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
-
-  // Create Teams Button Logic: This button will show once max players are confirmed
-  const handleCreateTeams = () => {
-    // Prompt manager for the number of groups using Alert
-    Alert.prompt(
-      "Create Teams",
-      "Enter the number of teams:",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
           text: "Create",
-          onPress: (input) => {
-            const numOfGroups = parseInt(input || "");
-  
-            // Validate the number of groups
-            if (isNaN(numOfGroups) || numOfGroups <= 0) {
-              Alert.alert("Invalid Input", "Please enter a valid number of groups.");
-              return;
-            }
-  
-            // Check if total players are divisible by the number of groups
+          onPress: async (input) => {
+            const count = parseInt(input || "");
             const totalPlayers = event.players?.length || 0;
-  
-            if (totalPlayers % numOfGroups !== 0) {
-              Alert.alert(
-                "Invalid Group Division",
-                `You cannot divide ${totalPlayers} players into ${numOfGroups} groups evenly. Please choose a valid number of groups.`
-              );
+            if (!count || totalPlayers % count !== 0) {
+              Alert.alert("Invalid", "Please enter a valid number.");
               return;
             }
-  
-            // Proceed to divide players into groups
-            // Proceed with dividing players and creating the teams logic
-            Alert.alert("Teams Created", "The teams have been successfully divided!");
+
+            const players = event.players || [];
+            const method = event.gameMethod || "Match Making";
+            const playerDetails = await Promise.all(
+              players.map(async (uid: string) => {
+                const userRef = doc(db, "users", uid);
+                const surveyRef = doc(db, "surveys", uid);
+                const [userSnap, surveySnap] = await Promise.all([
+                  getDoc(userRef),
+                  getDoc(surveyRef),
+                ]);
+                const name = userSnap.exists() ? userSnap.data().name : uid;
+                const survey = surveySnap.exists() ? surveySnap.data() : {};
+                return { uid, name, survey };
+              })
+            );
+
+            const grouped: Record<string, string[]> = {};
+            if (method === "Match Making") {
+              playerDetails.sort(
+                (a, b) => (b.survey.skillLevel || 1) - (a.survey.skillLevel || 1)
+              );
+              for (let i = 0; i < count; i++) grouped[`Group ${i + 1}`] = [];
+              playerDetails.forEach((p, i) => {
+                grouped[`Group ${(i % count) + 1}`].push(`${p.name} (${p.survey.skillLevel || 1}⭐)`);
+              });
+            } else {
+              const goalkeepers: any[] = [];
+              const others: any[] = [];
+              for (const player of playerDetails) {
+                const { survey } = player;
+                let positions = survey.positions || [];
+                let lastPlayed = survey.lastPositionPlayed || [];
+
+                if (positions.length === 1) {
+                  player.position = positions[0];
+                } else {
+                  if (!lastPlayed) lastPlayed = [];
+                  const remaining = positions.filter((p: any) => !lastPlayed.includes(p));
+                  if (remaining.length === 0) lastPlayed = [];
+                  const choices = remaining.length ? remaining : positions;
+                  const chosen = choices[Math.floor(Math.random() * choices.length)];
+                  player.position = chosen;
+                  const surveyRef = doc(db, "surveys", player.uid);
+                  const newHistory = [...lastPlayed, chosen];
+                  await updateDoc(surveyRef, { lastPositionPlayed: newHistory });
+                }
+
+                if (player.position === "goalkeeper") {
+                  goalkeepers.push(player);
+                } else {
+                  others.push(player);
+                }
+              }
+
+              for (let i = 0; i < count; i++) grouped[`Group ${i + 1}`] = [];
+              goalkeepers.forEach((p, i) =>
+                grouped[`Group ${(i % count) + 1}`].push(`${p.name} (GK)`)
+              );
+              others.forEach((p, i) =>
+                grouped[`Group ${(i % count) + 1}`].push(`${p.name} (${p.position})`)
+              );
+            }
+
+            await updateDoc(doc(db, "events", eventId), { teams: grouped });
+            setTeams(grouped);
           },
         },
       ],
@@ -180,7 +221,6 @@ export default function EventDetailScreen() {
       "numeric"
     );
   };
-  
 
   if (loading) {
     return (
@@ -203,7 +243,6 @@ export default function EventDetailScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Buttons for Edit Event and Cancel Event moved above the event title */}
       <View style={styles.header}>
         {isManager && (
           <>
@@ -218,9 +257,10 @@ export default function EventDetailScreen() {
       </View>
 
       <Text style={styles.title}>{event.name}</Text>
-
       <Text style={styles.label}>Date:</Text>
-      <Text style={styles.value}>{new Date(event.date?.seconds * 1000).toDateString()}</Text>
+      <Text style={styles.value}>
+        {new Date(event.date?.seconds * 1000).toDateString()}
+      </Text>
 
       <Text style={styles.label}>Game Method:</Text>
       <Text style={styles.value}>{event.gameMethod}</Text>
@@ -228,21 +268,10 @@ export default function EventDetailScreen() {
       <Text style={styles.label}>Max Players:</Text>
       <Text style={styles.value}>{event.maxPlayers}</Text>
 
-      <Text style={styles.label}>Description:</Text>
-      <Text style={styles.value}>{event.description || "No description provided."}</Text>
-
-      <Text style={styles.label}>Location:</Text>
-      <Text style={styles.value}>
-        Latitude: {event.location?.latitude}, Longitude: {event.location?.longitude}
-      </Text>
-
-      <Text style={styles.label}>
-        Confirmed Players ({confirmedCount}/{event.maxPlayers}):
-      </Text>
+      <Text style={styles.label}>Confirmed Players ({confirmedCount}/{event.maxPlayers}):</Text>
       {playerNames.map((name, i) => (
         <Text key={i} style={styles.playerItem}>• {name}</Text>
       ))}
-
 
       <View style={styles.buttonRow}>
         <TouchableOpacity
@@ -253,25 +282,34 @@ export default function EventDetailScreen() {
           ]}
           onPress={handleJoin}
           disabled={isFull && !isComing}
-          >
+        >
           <Text style={styles.buttonText}>GameTime</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.redButton]}
-          onPress={handleLeave}
-          >
+        <TouchableOpacity style={[styles.button, styles.redButton]} onPress={handleLeave}>
           <Text style={styles.buttonText}>Not Coming</Text>
         </TouchableOpacity>
       </View>
-          {isManager && confirmedCount >= event.maxPlayers && (
-            <TouchableOpacity 
-              style={styles.createTeamsButton} 
-              onPress={handleCreateTeams}
-            >
-              <Text style={styles.buttonText}>Create Teams</Text>
-            </TouchableOpacity>
-          )}
+
+      {isManager && isFull && (
+        <TouchableOpacity style={styles.createTeamsButton} onPress={handleCreateTeams}>
+          <Text style={styles.buttonText}>Create Teams</Text>
+        </TouchableOpacity>
+      )}
+
+      {teams && Object.keys(teams).length > 0 && (
+        <View style={{ marginTop: 40 }}>
+          <Text style={styles.label}>Created Teams ({event.gameMethod})</Text>
+          {Object.entries(teams).map(([groupName, players], i) => (
+            <View key={i} style={styles.groupCard}>
+              <Text style={styles.groupTitle}>{groupName}</Text>
+              {players.map((playerLine, j) => (
+                <Text key={j} style={styles.name}>{playerLine}</Text>
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
 
       <BottomNav />
     </ScrollView>
@@ -284,7 +322,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: "#f5f5f5",
     flexGrow: 1,
-    paddingBottom: 100, // Adjust if necessary
+    paddingBottom: 100,
   },
   loadingContainer: {
     flex: 1,
@@ -294,22 +332,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
     marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#1877F2",
   },
   editText: {
     fontSize: 16,
     color: "#1877F2",
-    textDecorationLine: "underline",
+    fontWeight: "bold",
   },
   cancelText: {
     color: "#dc3545",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "red",
+    textAlign: "center",
+    marginTop: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#1877F2",
   },
   label: {
     fontSize: 16,
@@ -319,18 +362,12 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 16,
-    marginBottom: 5,
     color: "#555",
   },
   playerItem: {
     fontSize: 15,
     marginLeft: 10,
     color: "#222",
-  },
-  errorText: {
-    fontSize: 18,
-    color: "red",
-    textAlign: "center",
   },
   buttonRow: {
     flexDirection: "row",
@@ -363,5 +400,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     marginTop: 20,
+  },
+  groupCard: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  groupTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1877F2",
+    marginBottom: 5,
+  },
+  name: {
+    fontSize: 14,
+    color: "#333",
   },
 });
