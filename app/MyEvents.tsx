@@ -135,10 +135,12 @@ export default function MyEventsScreen() {
           pastEvents.length > 0 ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Past Events</Text>
-              {pastEvents.map((event) => renderEvent({ item: event }))}
+              {pastEvents.map((event) => (
+                <View key={event.id}>{renderEvent({ item: event })}</View>
+              ))}
             </View>
           ) : null
-        }
+        }        
         ListEmptyComponent={
           <Text style={styles.empty}>No events found.</Text>
         }
