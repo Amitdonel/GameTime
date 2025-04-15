@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-// ✅ Image map for asset lookup
 const imageMap: { [key: string]: any } = {
   "soccer.jpg": require("../assets/images/soccer.jpg"),
   "soccer1.jpg": require("../assets/images/soccer1.jpg"),
@@ -30,23 +29,19 @@ export default function HomeScreen() {
   const [fullName, setFullName] = useState("Player");
   const [profileReady, setProfileReady] = useState(false);
   const [yourEvents, setYourEvents] = useState<any[]>([]);
+  const [pastYourEvents, setPastYourEvents] = useState<any[]>([]);
   const [nearbyEvents, setNearbyEvents] = useState<any[]>([]);
-
   const router = useRouter();
   const user = getAuth().currentUser;
 
-  const haversineDistance = (coord1: { latitude: number; longitude: number }, coord2: { latitude: number; longitude: number }) => {
+  const haversineDistance = (coord1: any, coord2: any) => {
     const toRad = (value: number) => (value * Math.PI) / 180;
     const R = 6371;
     const dLat = toRad(coord2.latitude - coord1.latitude);
     const dLon = toRad(coord2.longitude - coord1.longitude);
     const lat1 = toRad(coord1.latitude);
     const lat2 = toRad(coord2.latitude);
-
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
@@ -54,66 +49,47 @@ export default function HomeScreen() {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchUserData = async () => {
+    const fetchData = async () => {
       if (!user) return;
 
       const userRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(userRef);
-
-      if (docSnap.exists() && isMounted) {
-        const data = docSnap.data();
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const data = userSnap.data();
         setFullName(data.name || "Player");
-
-        if (data.photoUrl && data.photoUrl.length > 5 && data.photoUrl !== userImage.uri) {
-          setUserImage({ uri: data.photoUrl });
-        }
+        if (data.photoUrl) setUserImage({ uri: data.photoUrl });
       }
-    };
-
-    const fetchEvents = async () => {
-      if (!user) return;
 
       const surveyRef = doc(db, "surveys", user.uid);
       const surveySnap = await getDoc(surveyRef);
       if (!surveySnap.exists()) return;
+      const { location, playRadius } = surveySnap.data();
+      if (!location) return;
 
-      const surveyData = surveySnap.data();
-      const userLocation = surveyData.location;
-      const playRadius = surveyData.playRadius;
-      if (!userLocation || typeof userLocation.latitude !== "number") return;
+      const snapshot = await getDocs(collection(db, "events"));
+      const allEvents = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+      const now = Date.now();
 
-      const eventSnap = await getDocs(collection(db, "events"));
-      const allEvents = eventSnap.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as any),
-      }));
+      const yourUpcoming = allEvents.filter(e => e.createdBy === user.uid && e.date?.seconds * 1000 >= now);
+      const yourPast = allEvents.filter(e => e.createdBy === user.uid && e.date?.seconds * 1000 < now);
 
-      const your: any[] = [];
-      const nearby: any[] = [];
-
-      allEvents.forEach((event) => {
-        const isOwnedByUser = event.createdBy && event.createdBy === user.uid;
-        const hasValidLocation = event.location && typeof event.location.latitude === "number";
-
-        if (isOwnedByUser) {
-          your.push(event);
-        } else if (hasValidLocation) {
-          const dist = haversineDistance(userLocation, event.location);
-          if (dist <= playRadius) {
-            nearby.push(event);
-          }
-        }
+      const nearby = allEvents.filter(e => {
+        const isPast = e.date?.seconds * 1000 < now;
+        const isOwned = e.createdBy === user.uid;
+        const validLoc = e.location && typeof e.location.latitude === "number";
+        if (isPast || !validLoc || isOwned) return false;
+        const dist = haversineDistance(location, e.location);
+        return dist <= playRadius;
       });
 
       if (isMounted) {
-        setYourEvents(your);
+        setYourEvents(yourUpcoming);
+        setPastYourEvents(yourPast);
         setNearbyEvents(nearby);
       }
     };
 
-    fetchUserData();
-    fetchEvents();
-
+    fetchData();
     return () => {
       isMounted = false;
     };
@@ -129,75 +105,58 @@ export default function HomeScreen() {
     return (
       <TouchableOpacity
         style={styles.eventCard}
-        onPress={() =>
-          router.push({
-            pathname: "/EventDetail",
-            params: { eventId: item.id },
-          })
-        }
+        onPress={() => router.push({ pathname: "/EventDetail", params: { eventId: item.id } })}
       >
         <Image source={imgSrc} style={styles.eventImage} />
         <Text style={styles.eventTitle}>{item.name}</Text>
-        <Text style={styles.eventInfo}>
-          {item.gameMethod} | {confirmed} / {max} players
-        </Text>
-        {almostThere && (
-          <Text style={styles.almostThere}>ALMOST THERE!</Text>
-        )}
+        <Text style={styles.eventInfo}>{item.gameMethod} | {confirmed}/{max} players</Text>
+        {almostThere && <Text style={styles.almostThere}>ALMOST THERE!</Text>}
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.greeting}>Hello, {fullName}</Text>
         <TouchableOpacity onPress={() => router.push("/Profile")} style={styles.profileWrapper}>
           <View style={styles.profileInnerWrapper}>
-            <Image
-              source={userImage}
-              style={styles.profileIcon}
-              onLoad={() => setProfileReady(true)}
-              onError={() => setProfileReady(true)}
-            />
-            {profileReady && (
-              <Ionicons
-                name="person"
-                size={24}
-                color="white"
-                style={styles.profileIconOverlay}
-              />
-            )}
+            <Image source={userImage} style={styles.profileIcon} />
+            {profileReady && <Ionicons name="person" size={24} color="white" style={styles.profileIconOverlay} />}
           </View>
         </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
           <Text style={styles.sectionTitle}>Your Upcoming Events</Text>
-          {yourEvents.length > 0 ? (
-            <FlatList
-              data={yourEvents}
-              keyExtractor={(item) => item.id}
-              renderItem={renderEvent}
-              scrollEnabled={false}
-            />
-          ) : (
-            <Text style={styles.noEvents}>You haven't created any events yet.</Text>
-          )}
+          <FlatList
+            data={yourEvents}
+            keyExtractor={item => item.id}
+            renderItem={renderEvent}
+            scrollEnabled={false}
+            ListEmptyComponent={<Text style={styles.noEvents}>No upcoming events found.</Text>}
+          />
 
           <Text style={styles.sectionTitle}>Events Near You</Text>
-          {nearbyEvents.length > 0 ? (
-            <FlatList
-              data={nearbyEvents}
-              keyExtractor={(item) => item.id}
-              renderItem={renderEvent}
-              scrollEnabled={false}
-            />
-          ) : (
-            <Text style={styles.noEvents}>There are no events near you.</Text>
+          <FlatList
+            data={nearbyEvents}
+            keyExtractor={item => item.id}
+            renderItem={renderEvent}
+            scrollEnabled={false}
+            ListEmptyComponent={<Text style={styles.noEvents}>No nearby events found.</Text>}
+          />
+
+          {pastYourEvents.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Your Past Events</Text>
+              <FlatList
+                data={pastYourEvents}
+                keyExtractor={item => item.id}
+                renderItem={renderEvent}
+                scrollEnabled={false}
+              />
+            </>
           )}
         </View>
       </ScrollView>
@@ -208,103 +167,31 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  scrollContent: {
-    paddingBottom: 120,
-  },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
+  scrollContent: { paddingBottom: 120 },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: "#1877F2",
-    minHeight: 120,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20, backgroundColor: "#1877F2",
   },
-  greeting: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "white",
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-    marginTop: 20,
-    color: "#1877F2",
-  },
-  noEvents: {
-    fontSize: 14,
-    fontStyle: "italic",
-    color: "#777",
-    marginBottom: 10,
-  },
+  greeting: { fontSize: 22, fontWeight: "bold", color: "white" },
+  content: { paddingHorizontal: 20, paddingTop: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10, marginTop: 20, color: "#1877F2" },
+  noEvents: { fontSize: 14, fontStyle: "italic", color: "#777", marginBottom: 10 },
   eventCard: {
-    backgroundColor: "white",
-    borderRadius: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    overflow: "hidden",
+    backgroundColor: "white", borderRadius: 10, marginBottom: 16,
+    borderWidth: 1, borderColor: "#ddd", overflow: "hidden",
   },
-  eventImage: {
-    width: "100%",
-    height: 160,
-    resizeMode: "cover",
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
-  eventInfo: {
-    fontSize: 14,
-    paddingHorizontal: 12,
-    paddingBottom: 4,
-    color: "#333",
-  },
-  almostThere: {
-    fontSize: 14,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    fontWeight: "bold",
-    color: "#f44336",
-  },
+  eventImage: { width: "100%", height: 160, resizeMode: "cover" },
+  eventTitle: { fontSize: 16, fontWeight: "bold", paddingHorizontal: 12, paddingTop: 10 },
+  eventInfo: { fontSize: 14, paddingHorizontal: 12, paddingBottom: 4, color: "#333" },
+  almostThere: { fontSize: 14, paddingHorizontal: 12, paddingBottom: 10, fontWeight: "bold", color: "#f44336" },
   profileWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#ddd",
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
+    width: 44, height: 44, borderRadius: 22, backgroundColor: "#ddd",
+    overflow: "hidden", justifyContent: "center", alignItems: "center",
   },
   profileInnerWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    overflow: "hidden",
-    position: "relative",
+    width: 40, height: 40, borderRadius: 20, overflow: "hidden", position: "relative",
   },
-  profileIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    resizeMode: "cover",
-    backgroundColor: "#ccc",
-  },
-  profileIconOverlay: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-  },
+  profileIcon: { width: 40, height: 40, borderRadius: 20, resizeMode: "cover", backgroundColor: "#ccc" },
+  profileIconOverlay: { position: "absolute", top: 8, left: 8 },
 });

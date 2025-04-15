@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -240,79 +239,84 @@ export default function EventDetailScreen() {
 
   const confirmedCount = event.players?.length || 0;
   const isFull = confirmedCount >= event.maxPlayers;
+  const showTeams = isFull && teams && Object.keys(teams).length > 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        {isManager && (
-          <>
-            <TouchableOpacity onPress={() => router.push(`/EditEvent?eventId=${eventId}`)}>
-              <Text style={styles.editText}>Edit Event</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleCancelEvent}>
-              <Text style={[styles.editText, styles.cancelText]}>Cancel Event</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-
-      <Text style={styles.title}>{event.name}</Text>
-      <Text style={styles.label}>Date:</Text>
-      <Text style={styles.value}>
-        {new Date(event.date?.seconds * 1000).toDateString()}
-      </Text>
-
-      <Text style={styles.label}>Game Method:</Text>
-      <Text style={styles.value}>{event.gameMethod}</Text>
-
-      <Text style={styles.label}>Max Players:</Text>
-      <Text style={styles.value}>{event.maxPlayers}</Text>
-
-      <Text style={styles.label}>Confirmed Players ({confirmedCount}/{event.maxPlayers}):</Text>
-      {playerNames.map((name, i) => (
-        <Text key={i} style={styles.playerItem}>• {name}</Text>
-      ))}
-
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[
-            styles.button,
-            styles.greenButton,
-            isFull && !isComing && styles.disabledButton,
-          ]}
-          onPress={handleJoin}
-          disabled={isFull && !isComing}
-        >
-          <Text style={styles.buttonText}>GameTime</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.button, styles.redButton]} onPress={handleLeave}>
-          <Text style={styles.buttonText}>Not Coming</Text>
-        </TouchableOpacity>
-      </View>
-
-      {isManager && isFull && (
-        <TouchableOpacity style={styles.createTeamsButton} onPress={handleCreateTeams}>
-          <Text style={styles.buttonText}>Create Teams</Text>
-        </TouchableOpacity>
-      )}
-
-      {teams && Object.keys(teams).length > 0 && (
-        <View style={{ marginTop: 40 }}>
-          <Text style={styles.label}>Created Teams ({event.gameMethod})</Text>
-          {Object.entries(teams).map(([groupName, players], i) => (
-            <View key={i} style={styles.groupCard}>
-              <Text style={styles.groupTitle}>{groupName}</Text>
-              {players.map((playerLine, j) => (
-                <Text key={j} style={styles.name}>{playerLine}</Text>
-              ))}
-            </View>
-          ))}
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={[styles.container, { flexGrow: 1 }]}>
+        <View style={styles.header}>
+          {isManager && (
+            <>
+              <TouchableOpacity onPress={() => router.push(`/EditEvent?eventId=${eventId}`)}>
+                <Text style={styles.editText}>Edit Event</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleCancelEvent}>
+                <Text style={[styles.editText, styles.cancelText]}>Cancel Event</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
-      )}
+
+        <Text style={styles.title}>{event.name}</Text>
+        <Text style={styles.label}>Date:</Text>
+        <Text style={styles.value}>
+          {new Date(event.date?.seconds * 1000).toDateString()}
+        </Text>
+
+        <Text style={styles.label}>Game Method:</Text>
+        <Text style={styles.value}>{event.gameMethod}</Text>
+
+        <Text style={styles.label}>Max Players:</Text>
+        <Text style={styles.value}>{event.maxPlayers}</Text>
+
+        <Text style={styles.label}>
+          Confirmed Players ({confirmedCount}/{event.maxPlayers}):
+        </Text>
+        {playerNames.map((name, i) => (
+          <Text key={i} style={styles.playerItem}>• {name}</Text>
+        ))}
+
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              styles.greenButton,
+              isFull && !isComing && styles.disabledButton,
+            ]}
+            onPress={handleJoin}
+            disabled={isFull && !isComing}
+          >
+            <Text style={styles.buttonText}>GameTime</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.button, styles.redButton]} onPress={handleLeave}>
+            <Text style={styles.buttonText}>Not Coming</Text>
+          </TouchableOpacity>
+        </View>
+
+        {isManager && isFull && (
+          <TouchableOpacity style={styles.createTeamsButton} onPress={handleCreateTeams}>
+            <Text style={styles.buttonText}>Create Teams</Text>
+          </TouchableOpacity>
+        )}
+
+        {showTeams && (
+          <View style={{ marginTop: 40 }}>
+            <Text style={styles.label}>Created Teams ({event.gameMethod})</Text>
+            {Object.entries(teams).map(([groupName, players], i) => (
+              <View key={i} style={styles.groupCard}>
+                <Text style={styles.groupTitle}>{groupName}</Text>
+                {players.map((playerLine, j) => (
+                  <Text key={j} style={styles.name}>{playerLine}</Text>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
       <BottomNav />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -321,7 +325,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     backgroundColor: "#f5f5f5",
-    flexGrow: 1,
     paddingBottom: 100,
   },
   loadingContainer: {

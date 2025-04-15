@@ -93,137 +93,140 @@ export default function EditEventScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Edit Event</Text>
+    < View >
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Edit Event</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Event Name"
-        value={eventData.name}
-        onChangeText={(text) => setEventData({ ...eventData, name: text })}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Event Name"
+          value={eventData.name}
+          onChangeText={(text) => setEventData({ ...eventData, name: text })}
+        />
 
-      <TouchableOpacity
-        style={styles.input}
-        onPress={() => setDatePickerOpen(true)}
-      >
-        <Text>{eventData.date.toDateString()}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setDatePickerOpen(true)}
+        >
+          <Text>{eventData.date.toDateString()}</Text>
+        </TouchableOpacity>
 
-      {datePickerOpen && (
-        <View style={styles.datePickerContainer}>
-          <DateTimePicker
-            value={eventData.date}
-            mode="date"
-            display="spinner"
-            onChange={(e, selectedDate) => {
-              if (selectedDate) {
-                setEventData({ ...eventData, date: selectedDate });
-                setDatePickerOpen(false);
-              }
-            }}
-          />
-        </View>
-      )}
+        {datePickerOpen && (
+          <View style={styles.datePickerContainer}>
+            <DateTimePicker
+              value={eventData.date}
+              mode="date"
+              display="spinner"
+              onChange={(e, selectedDate) => {
+                if (selectedDate) {
+                  setEventData({ ...eventData, date: selectedDate });
+                  setDatePickerOpen(false);
+                }
+              }}
+            />
+          </View>
+        )}
 
-      <Text style={styles.label}>Max Players: {eventData.maxPlayers}</Text>
-      <Slider
-        style={{ width: "100%", height: 40 }}
-        minimumValue={1}
-        maximumValue={50}
-        step={1}
-        value={eventData.maxPlayers}
-        onValueChange={(val) => setEventData({ ...eventData, maxPlayers: val })}
-        minimumTrackTintColor="#1877F2"
-        maximumTrackTintColor="#ddd"
-        thumbTintColor="#1877F2"
-      />
+        <Text style={styles.label}>Max Players: {eventData.maxPlayers}</Text>
+        <Slider
+          style={{ width: "100%", height: 40 }}
+          minimumValue={1}
+          maximumValue={50}
+          step={1}
+          value={eventData.maxPlayers}
+          onValueChange={(val) => setEventData({ ...eventData, maxPlayers: val })}
+          minimumTrackTintColor="#1877F2"
+          maximumTrackTintColor="#ddd"
+          thumbTintColor="#1877F2"
+        />
 
-      <Text style={styles.label}>Game Method:</Text>
-      <View style={styles.radioContainer}>
-        {["Match Making", "Optimization"].map((method) => (
-          <TouchableOpacity
-            key={method}
-            style={[
-              styles.radioButton,
-              eventData.gameMethod === method && styles.radioButtonSelected,
-            ]}
-            onPress={() => setEventData({ ...eventData, gameMethod: method })}
-          >
-            <Text
-              style={[
-                styles.radioText,
-                eventData.gameMethod === method && { color: "#fff" },
-              ]}
-            >
-              {method}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.label}>Description:</Text>
-      <TextInput
-        style={styles.textarea}
-        multiline
-        value={eventData.description}
-        onChangeText={(text) =>
-          setEventData({ ...eventData, description: text })
-        }
-      />
-
-      <Text style={styles.label}>Choose Image:</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
-        <View style={{ flexDirection: "row" }}>
-          {["soccer.jpg", "soccer1.jpg", "soccer2.jpg", "soccer3.jpg"].map((img) => (
+        <Text style={styles.label}>Game Method:</Text>
+        <View style={styles.radioContainer}>
+          {["Match Making", "Optimization"].map((method) => (
             <TouchableOpacity
-              key={img}
-              onPress={() => setEventData({ ...eventData, image: img })}
-              style={{ marginRight: 10 }}
+              key={method}
+              style={[
+                styles.radioButton,
+                eventData.gameMethod === method && styles.radioButtonSelected,
+              ]}
+              onPress={() => setEventData({ ...eventData, gameMethod: method })}
             >
-              <Image
-                source={imageMap[img]}
+              <Text
                 style={[
-                  styles.thumbnail,
-                  eventData.image === img && styles.selectedThumbnail,
+                  styles.radioText,
+                  eventData.gameMethod === method && { color: "#fff" },
                 ]}
-              />
+              >
+                {method}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
+
+        <Text style={styles.label}>Description:</Text>
+        <TextInput
+          style={styles.textarea}
+          multiline
+          value={eventData.description}
+          onChangeText={(text) =>
+            setEventData({ ...eventData, description: text })
+          }
+        />
+
+        <Text style={styles.label}>Choose Image:</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
+          <View style={{ flexDirection: "row" }}>
+            {["soccer.jpg", "soccer1.jpg", "soccer2.jpg", "soccer3.jpg"].map((img) => (
+              <TouchableOpacity
+                key={img}
+                onPress={() => setEventData({ ...eventData, image: img })}
+                style={{ marginRight: 10 }}
+              >
+                <Image
+                  source={imageMap[img]}
+                  style={[
+                    styles.thumbnail,
+                    eventData.image === img && styles.selectedThumbnail,
+                  ]}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+
+        <Text style={styles.label}>Event Location:</Text>
+        <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
+          <MapView
+            style={{ flex: 1 }}
+            region={{
+              latitude: eventData.location.latitude,
+              longitude: eventData.location.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+            onRegionChangeComplete={(newRegion) => {
+              setEventData({
+                ...eventData,
+                location: {
+                  latitude: newRegion.latitude,
+                  longitude: newRegion.longitude,
+                },
+              });
+            }}
+          />
+          <View style={styles.pinContainer}>
+            <Ionicons name="location-sharp" size={40} color="red" />
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        </TouchableOpacity>
       </ScrollView>
 
-
-      <Text style={styles.label}>Event Location:</Text>
-      <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
-        <MapView
-          style={{ flex: 1 }}
-          region={{
-            latitude: eventData.location.latitude,
-            longitude: eventData.location.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-          onRegionChangeComplete={(newRegion) => {
-            setEventData({
-              ...eventData,
-              location: {
-                latitude: newRegion.latitude,
-                longitude: newRegion.longitude,
-              },
-            });
-          }}
-        />
-        <View style={styles.pinContainer}>
-          <Ionicons name="location-sharp" size={40} color="red" />
-        </View>
-      </View>
       <BottomNav />
-
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Changes</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 }
 

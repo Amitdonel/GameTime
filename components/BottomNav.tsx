@@ -17,7 +17,7 @@ export default function BottomNav() {
       <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
         <Ionicons name="search" size={35} color="#000000" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/MyGroups")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/MyEvents")}>
         <Ionicons name="people" size={35} color="#1877F2" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Settings")}>
