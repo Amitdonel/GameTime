@@ -164,17 +164,33 @@ export default function EventDetailScreen() {
             );
 
             const grouped: Record<string, string[]> = {};
+            for (let i = 0; i < count; i++) grouped[`Group ${i + 1}`] = [];
+
             if (method === "Match Making") {
+              const skillMap = {
+                "Beginner ⭐": 1,
+                "Average ⭐⭐": 2,
+                "Intermediate ⭐⭐⭐": 3,
+                "Advanced ⭐⭐⭐⭐": 4,
+                "Professional ⭐⭐⭐⭐⭐": 5,
+              };
+
               playerDetails.sort(
-                (a, b) => (b.survey.skillLevel || 1) - (a.survey.skillLevel || 1)
+                (a, b) => (skillMap[b.survey.skillLevel as keyof typeof skillMap] || 1) - (skillMap[a.survey.skillLevel as keyof typeof skillMap] || 1)
               );
-              for (let i = 0; i < count; i++) grouped[`Group ${i + 1}`] = [];
-              playerDetails.forEach((p, i) => {
-                grouped[`Group ${(i % count) + 1}`].push(`${p.name} (${p.survey.skillLevel || 1}⭐)`);
-              });
+
+              const groupTotals = Array(count).fill(0);
+              for (const player of playerDetails) {
+                const skill = skillMap[player.survey.skillLevel as keyof typeof skillMap] || 1;
+                const minIndex = groupTotals.indexOf(Math.min(...groupTotals));
+                grouped[`Group ${minIndex + 1}`].push(`${player.name} (${player.survey.skillLevel})`);
+                groupTotals[minIndex] += skill;
+              }
+
             } else {
               const goalkeepers: any[] = [];
               const others: any[] = [];
+
               for (const player of playerDetails) {
                 const { survey } = player;
                 let positions = survey.positions || [];
@@ -183,31 +199,65 @@ export default function EventDetailScreen() {
                 if (positions.length === 1) {
                   player.position = positions[0];
                 } else {
-                  if (!lastPlayed) lastPlayed = [];
                   const remaining = positions.filter((p: any) => !lastPlayed.includes(p));
-                  if (remaining.length === 0) lastPlayed = [];
                   const choices = remaining.length ? remaining : positions;
                   const chosen = choices[Math.floor(Math.random() * choices.length)];
                   player.position = chosen;
-                  const surveyRef = doc(db, "surveys", player.uid);
-                  const newHistory = [...lastPlayed, chosen];
-                  await updateDoc(surveyRef, { lastPositionPlayed: newHistory });
+                  await updateDoc(doc(db, "surveys", player.uid), {
+                    lastPositionPlayed: [...lastPlayed, chosen],
+                  });
                 }
 
-                if (player.position === "goalkeeper") {
+                if (player.position.toLowerCase() === "goalkeeper") {
                   goalkeepers.push(player);
                 } else {
                   others.push(player);
                 }
               }
 
-              for (let i = 0; i < count; i++) grouped[`Group ${i + 1}`] = [];
-              goalkeepers.forEach((p, i) =>
-                grouped[`Group ${(i % count) + 1}`].push(`${p.name} (GK)`)
-              );
-              others.forEach((p, i) =>
-                grouped[`Group ${(i % count) + 1}`].push(`${p.name} (${p.position})`)
-              );
+              const totalPlayers = goalkeepers.length + others.length;
+              const targetPerGroup = Math.floor(totalPlayers / count);
+              const teams: string[][] = Array.from({ length: count }, () => []);
+              const notes: Record<number, string> = {};
+
+              // Assign 1 GK per group (if available)
+              for (let i = 0; i < count; i++) {
+                const gk = goalkeepers.shift();
+                if (gk) {
+                  teams[i].push(`${gk.name} (GK)`);
+                } else {
+                  notes[i] = "GK own handling";
+                }
+              }
+
+              // Remaining GKs → treat as field players
+              while (goalkeepers.length) {
+                const gk = goalkeepers.shift();
+                const minIndex = teams.reduce(
+                  (minIdx, t, idx, arr) =>
+                    t.length < arr[minIdx].length ? idx : minIdx,
+                  0
+                );
+                teams[minIndex].push(`${gk.name} (GK, field)`);
+                notes[minIndex] = "Extra GK - played as field player";
+              }
+
+              // Assign field players, keeping all groups balanced
+              for (const player of others) {
+                const minIndex = teams.reduce(
+                  (minIdx, t, idx, arr) =>
+                    t.length < arr[minIdx].length ? idx : minIdx,
+                  0
+                );
+                teams[minIndex].push(`${player.name} (${player.position})`);
+              }
+
+              // Build final structure
+              for (let i = 0; i < count; i++) {
+                const groupName = `Group ${i + 1}`;
+                grouped[groupName] = teams[i];
+                if (notes[i]) grouped[groupName].push(`📝 ${notes[i]}`);
+              }
             }
 
             await updateDoc(doc(db, "events", eventId), { teams: grouped });
@@ -220,6 +270,7 @@ export default function EventDetailScreen() {
       "numeric"
     );
   };
+
 
   if (loading) {
     return (
@@ -303,16 +354,34 @@ export default function EventDetailScreen() {
         {showTeams && (
           <View style={{ marginTop: 40 }}>
             <Text style={styles.label}>Created Teams ({event.gameMethod})</Text>
-            {Object.entries(teams).map(([groupName, players], i) => (
-              <View key={i} style={styles.groupCard}>
-                <Text style={styles.groupTitle}>{groupName}</Text>
-                {players.map((playerLine, j) => (
-                  <Text key={j} style={styles.name}>{playerLine}</Text>
-                ))}
-              </View>
-            ))}
+            {Object.entries(teams).map(([groupName, players], i) => {
+              // Calculate average only for Match Making
+              let averageStars = null;
+              if (event.gameMethod === "Match Making") {
+                averageStars =
+                  players.reduce((sum, player) => {
+                    const match = player.match(/⭐+/);
+                    return sum + (match ? match[0].length : 0);
+                  }, 0) / players.length;
+              }
+
+              return (
+                <View key={i} style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>{groupName}</Text>
+                  {players.map((playerLine, j) => (
+                    <Text key={j} style={styles.name}>{playerLine}</Text>
+                  ))}
+                  {averageStars !== null && (
+                    <Text style={styles.average}>
+                      ⭐ Average: {averageStars.toFixed(2)} Stars
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
           </View>
         )}
+
       </ScrollView>
 
       <BottomNav />
@@ -421,5 +490,11 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 14,
     color: "#333",
+  },
+  average: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#444",
+    fontWeight: "600",
   },
 });

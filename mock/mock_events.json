@@ -1,0 +1,76 @@
+[
+  {
+    "name": "Match Making Test Event",
+    "date": {
+      "seconds": 1744886153
+    },
+    "gameMethod": "Match Making",
+    "createdBy": "73c2de17-3f5b-4d93-a",
+    "players": [
+      "73c2de17-3f5b-4d93-a",
+      "4a9a20fe-a653-4cf2-a",
+      "8bf98fc4-4bef-41d3-b",
+      "736120f1-a4b9-4f27-a",
+      "717a4a3e-178d-4a12-b",
+      "18486f91-a68d-48ab-a",
+      "1358b0a2-835c-41e6-b",
+      "8f385f08-265a-416d-8",
+      "9a8c1bbc-8275-419e-b",
+      "8e7f7a75-df67-48d6-9",
+      "3a56ff4a-cd01-4a5a-9",
+      "bb26aceb-e62b-4004-9",
+      "71dad6d8-baa9-46df-8",
+      "29380874-270a-45e2-8",
+      "016056e6-3927-42d2-9",
+      "34aa263d-93aa-4e4f-b",
+      "2b8f39df-8c63-4785-b",
+      "d2f74e8c-f277-47d3-a",
+      "3c81204c-44e0-4f3e-8",
+      "702d93f7-09a6-41a6-b"
+    ],
+    "maxPlayers": 20,
+    "location": {
+      "latitude": 31.7683,
+      "longitude": 35.2137
+    },
+    "description": "Test event for match making algorithm.",
+    "image": "soccer1.jpg"
+  },
+  {
+    "name": "Optimization Test Event",
+    "date": {
+      "seconds": 1744972553
+    },
+    "gameMethod": "Optimization",
+    "createdBy": "4a9a20fe-a653-4cf2-a",
+    "players": [
+      "73c2de17-3f5b-4d93-a",
+      "4a9a20fe-a653-4cf2-a",
+      "8bf98fc4-4bef-41d3-b",
+      "736120f1-a4b9-4f27-a",
+      "717a4a3e-178d-4a12-b",
+      "18486f91-a68d-48ab-a",
+      "1358b0a2-835c-41e6-b",
+      "8f385f08-265a-416d-8",
+      "9a8c1bbc-8275-419e-b",
+      "8e7f7a75-df67-48d6-9",
+      "3a56ff4a-cd01-4a5a-9",
+      "bb26aceb-e62b-4004-9",
+      "71dad6d8-baa9-46df-8",
+      "29380874-270a-45e2-8",
+      "016056e6-3927-42d2-9",
+      "34aa263d-93aa-4e4f-b",
+      "2b8f39df-8c63-4785-b",
+      "d2f74e8c-f277-47d3-a",
+      "3c81204c-44e0-4f3e-8",
+      "702d93f7-09a6-41a6-b"
+    ],
+    "maxPlayers": 20,
+    "location": {
+      "latitude": 31.0461,
+      "longitude": 34.8516
+    },
+    "description": "Test event for optimization algorithm.",
+    "image": "soccer2.jpg"
+  }
+]
