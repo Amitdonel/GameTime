@@ -226,7 +226,7 @@ export default function EventDetailScreen() {
                 if (gk) {
                   teams[i].push(`${gk.name} (GK)`);
                 } else {
-                  notes[i] = "GK own handling !";
+                  notes[i] = "GK own handling - Rotation!";
                 }
               }
 
@@ -239,7 +239,7 @@ export default function EventDetailScreen() {
                   0
                 );
                 teams[minIndex].push(`${gk.name} (GK, field)`);
-                notes[minIndex] = "Extra GK - played as field player!";
+                notes[minIndex] = "Extra GK - played as field player - Rotation!";
               }
 
               // Assign field players, keeping all groups balanced
