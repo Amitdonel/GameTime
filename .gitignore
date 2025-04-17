@@ -35,4 +35,8 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Examples or dev-only
 app-example
+
+# ✅ Mock files and secrets
+mock/
