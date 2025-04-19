@@ -121,8 +121,15 @@ export default function HomeScreen() {
         <Text style={styles.greeting}>Hello, {fullName}</Text>
         <TouchableOpacity onPress={() => router.push("/Profile")} style={styles.profileWrapper}>
           <View style={styles.profileInnerWrapper}>
-            <Image source={userImage} style={styles.profileIcon} />
-            {profileReady && <Ionicons name="person" size={24} color="white" style={styles.profileIconOverlay} />}
+            <Image
+              source={userImage}
+              style={styles.profileIcon}
+              onLoad={() => setProfileReady(true)}
+              onError={() => setProfileReady(true)}
+            />
+            {profileReady && (
+              <Ionicons name="person" size={24} color="white" style={styles.profileIconOverlay} />
+            )}
           </View>
         </TouchableOpacity>
       </View>

@@ -41,11 +41,12 @@ export default function ProfileScreen() {
       {/* Profile Avatar */}
       <View style={styles.avatarWrapper}>
         <Image source={anonymousImage} style={styles.avatar} />
-        <Ionicons name="person" size={24} color="white" style={styles.avatarOverlay} />
+        <View style={styles.overlayCenter}>
+          <Ionicons name="person" size={44} color="white" />
+        </View>
       </View>
-
       <Text style={styles.title}>{userName}</Text>
-      
+
 
       {/* Edit Survey Button */}
       <TouchableOpacity
@@ -73,25 +74,31 @@ const styles = StyleSheet.create({
     paddingTop: 80,
   },
   avatarWrapper: {
-    position: "relative",
     width: 100,
     height: 100,
-    marginBottom: 15,
+    borderRadius: 50,
     overflow: "hidden",
-    borderRadius: 50,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
     backgroundColor: "#ddd",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+
+  avatar: {
+    width: "100%",
+    height: "100%",
     resizeMode: "cover",
   },
-  avatarOverlay: {
+
+  overlayCenter: {
     position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -12 }, { translateY: -12 }],
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
   },
   title: {
     fontSize: 22,

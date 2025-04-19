@@ -115,7 +115,11 @@ export default function SearchScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
-              onPress={() => router.push(`/EventDetail?eventId=${item.id}`)}
+              onPress={() => router.push({
+                pathname: "/EventDetail",
+                params: { eventId: item.id },
+              } as any)}
+              
             >
               <Text style={styles.title}>{item.name}</Text>
               <Text style={styles.subtitle}>
