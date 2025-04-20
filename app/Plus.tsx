@@ -21,7 +21,6 @@ import Slider from "@react-native-community/slider";
 import { getAuth } from "firebase/auth";
 
 export default function PlusScreen() {
-
   const router = useRouter();
   const imageMap: { [key: string]: any } = {
     "soccer.jpg": require("../assets/images/soccer.jpg"),
@@ -33,6 +32,10 @@ export default function PlusScreen() {
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const [eventTime, setEventTime] = useState(new Date());
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   const [region, setRegion] = useState({
     latitude: 32.0853,
     longitude: 34.7818,
@@ -79,9 +82,14 @@ export default function PlusScreen() {
     }
 
     try {
+      const combinedDateTime = new Date(eventDate);
+      combinedDateTime.setHours(eventTime.getHours());
+      combinedDateTime.setMinutes(eventTime.getMinutes());
+      combinedDateTime.setSeconds(0);
+
       await addDoc(collection(db, "events"), {
         name: eventName,
-        date: Timestamp.fromDate(eventDate),
+        date: Timestamp.fromDate(combinedDateTime),
         location: selectedLocation,
         createdAt: Timestamp.now(),
         maxPlayers,
@@ -115,10 +123,10 @@ export default function PlusScreen() {
             onChangeText={setEventName}
           />
 
+          {/* Date Picker */}
           <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
             <Text style={{ color: "#000" }}>{eventDate.toDateString()}</Text>
           </TouchableOpacity>
-
           {showDatePicker && (
             <View style={styles.datePickerContainer}>
               <DateTimePicker
@@ -134,6 +142,31 @@ export default function PlusScreen() {
                 onPress={() => setShowDatePicker(false)}
               >
                 <Text style={styles.confirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Time Picker */}
+          <TouchableOpacity style={styles.input} onPress={() => setShowTimePicker(true)}>
+            <Text style={{ color: "#000" }}>
+              {eventTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </Text>
+          </TouchableOpacity>
+          {showTimePicker && (
+            <View style={styles.datePickerContainer}>
+              <DateTimePicker
+                value={eventTime}
+                mode="time"
+                display="spinner"
+                onChange={(event, selectedTime) => {
+                  if (selectedTime) setEventTime(selectedTime);
+                }}
+              />
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => setShowTimePicker(false)}
+              >
+                <Text style={styles.confirmButtonText}>Confirm Time</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -199,8 +232,7 @@ export default function PlusScreen() {
             </View>
           </ScrollView>
 
-
-          {/* Map Section */}
+          {/* Map */}
           <Text style={styles.mapLabel}>Select Event Location:</Text>
           <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
             <MapView

@@ -10,7 +10,7 @@ import {
   Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "../app/firebaseConfig";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import MapView from "react-native-maps";
@@ -31,6 +31,7 @@ export default function EditEventScreen() {
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState<any>({});
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => {
     if (!eventId) return;
@@ -69,7 +70,7 @@ export default function EditEventScreen() {
       const ref = doc(db, "events", eventId!);
       await updateDoc(ref, {
         name: eventData.name,
-        date: eventData.date,
+        date: Timestamp.fromDate(new Date(eventData.date)),
         gameMethod: eventData.gameMethod,
         maxPlayers: Number(eventData.maxPlayers),
         description: eventData.description,
@@ -93,7 +94,7 @@ export default function EditEventScreen() {
   }
 
   return (
-    < View >
+    <View>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Edit Event</Text>
 
@@ -119,9 +120,40 @@ export default function EditEventScreen() {
               display="spinner"
               onChange={(e, selectedDate) => {
                 if (selectedDate) {
-                  setEventData({ ...eventData, date: selectedDate });
-                  setDatePickerOpen(false);
+                  const updatedDate = new Date(eventData.date);
+                  updatedDate.setFullYear(selectedDate.getFullYear());
+                  updatedDate.setMonth(selectedDate.getMonth());
+                  updatedDate.setDate(selectedDate.getDate());
+                  setEventData({ ...eventData, date: updatedDate });
                 }
+                setDatePickerOpen(false);
+              }}
+            />
+          </View>
+        )}
+
+        {/* Time Picker */}
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowTimePicker(true)}
+        >
+          <Text>{eventData.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+        </TouchableOpacity>
+
+        {showTimePicker && (
+          <View style={styles.datePickerContainer}>
+            <DateTimePicker
+              value={eventData.date}
+              mode="time"
+              display="spinner"
+              onChange={(event, selectedTime) => {
+                if (selectedTime) {
+                  const newDate = new Date(eventData.date);
+                  newDate.setHours(selectedTime.getHours());
+                  newDate.setMinutes(selectedTime.getMinutes());
+                  setEventData({ ...eventData, date: newDate });
+                }
+                setShowTimePicker(false);
               }}
             />
           </View>
@@ -193,7 +225,6 @@ export default function EditEventScreen() {
             ))}
           </View>
         </ScrollView>
-
 
         <Text style={styles.label}>Event Location:</Text>
         <View style={{ width: "100%", height: 300, marginVertical: 15 }}>

@@ -131,6 +131,8 @@ export default function EventDetailScreen() {
     ]);
   };
 
+  // 🔁 SKIPPING REPEATED IMPORTS AND UI SECTIONS...
+
   const handleCreateTeams = async () => {
     Alert.prompt(
       "Create Teams",
@@ -149,6 +151,8 @@ export default function EventDetailScreen() {
 
             const players = event.players || [];
             const method = event.gameMethod || "Match Making";
+            const eventTime = new Date(event.date?.seconds * 1000);
+
             const playerDetails = await Promise.all(
               players.map(async (uid: string) => {
                 const userRef = doc(db, "users", uid);
@@ -159,7 +163,34 @@ export default function EventDetailScreen() {
                 ]);
                 const name = userSnap.exists() ? userSnap.data().name : uid;
                 const survey = surveySnap.exists() ? surveySnap.data() : {};
-                return { uid, name, survey };
+
+                let positions = survey.positions || [];
+                let lastPlayed = survey.lastPositionPlayed || [];
+
+                // If empty, refill positions from lastPlayed (like a queue)
+                if (!positions.length && lastPlayed?.length) {
+                  positions = [...lastPlayed];
+                  lastPlayed = [];
+                }
+
+                // Assign current position (peek front)
+                const chosen = positions[0];
+
+                // If time has passed, rotate position to lastPlayed
+                if (new Date() >= eventTime && chosen) {
+                  lastPlayed.push(chosen);
+                  positions = positions.slice(1);
+                  await updateDoc(surveyRef, {
+                    positions,
+                    lastPositionPlayed: lastPlayed,
+                  });
+                }
+
+                return {
+                  uid,
+                  name,
+                  position: chosen,
+                };
               })
             );
 
@@ -175,52 +206,38 @@ export default function EventDetailScreen() {
                 "Professional ⭐⭐⭐⭐⭐": 5,
               };
 
-              playerDetails.sort(
-                (a, b) => (skillMap[b.survey.skillLevel as keyof typeof skillMap] || 1) - (skillMap[a.survey.skillLevel as keyof typeof skillMap] || 1)
+              const detailsWithSkills = await Promise.all(
+                playerDetails.map(async (p) => {
+                  const surveyRef = doc(db, "surveys", p.uid);
+                  const surveySnap = await getDoc(surveyRef);
+                  const level = surveySnap.exists() ? surveySnap.data().skillLevel : "Beginner ⭐";
+                  return { ...p, skillLevel: level };
+                })
+              );
+
+              detailsWithSkills.sort(
+                (a, b) =>
+                  (skillMap[b.skillLevel as keyof typeof skillMap] || 1) -
+                  (skillMap[a.skillLevel as keyof typeof skillMap] || 1)
               );
 
               const groupTotals = Array(count).fill(0);
-              for (const player of playerDetails) {
-                const skill = skillMap[player.survey.skillLevel as keyof typeof skillMap] || 1;
+              for (const player of detailsWithSkills) {
+                const skill = skillMap[player.skillLevel as keyof typeof skillMap] || 1;
                 const minIndex = groupTotals.indexOf(Math.min(...groupTotals));
-                grouped[`Group ${minIndex + 1}`].push(`${player.name} (${player.survey.skillLevel})`);
+                grouped[`Group ${minIndex + 1}`].push(`${player.name} (${player.skillLevel})`);
                 groupTotals[minIndex] += skill;
               }
-
             } else {
-              const goalkeepers: any[] = [];
-              const others: any[] = [];
+              // Optimization
+              const goalkeepers = playerDetails.filter((p) => p.position?.toLowerCase() === "goalkeeper");
+              const fieldPlayers = playerDetails.filter((p) => p.position?.toLowerCase() !== "goalkeeper");
 
-              for (const player of playerDetails) {
-                const { survey } = player;
-                let positions = survey.positions || [];
-                let lastPlayed = survey.lastPositionPlayed || [];
-
-                if (positions.length === 1) {
-                  player.position = positions[0];
-                } else {
-                  const remaining = positions.filter((p: any) => !lastPlayed.includes(p));
-                  const choices = remaining.length ? remaining : positions;
-                  const chosen = choices[Math.floor(Math.random() * choices.length)];
-                  player.position = chosen;
-                  await updateDoc(doc(db, "surveys", player.uid), {
-                    lastPositionPlayed: [...lastPlayed, chosen],
-                  });
-                }
-
-                if (player.position.toLowerCase() === "goalkeeper") {
-                  goalkeepers.push(player);
-                } else {
-                  others.push(player);
-                }
-              }
-
-              const totalPlayers = goalkeepers.length + others.length;
-              const targetPerGroup = Math.floor(totalPlayers / count);
+              const totalPlayers = playerDetails.length;
               const teams: string[][] = Array.from({ length: count }, () => []);
               const notes: Record<number, string> = {};
 
-              // Assign 1 GK per group (if available)
+              // Assign GKs (one per group max)
               for (let i = 0; i < count; i++) {
                 const gk = goalkeepers.shift();
                 if (gk) {
@@ -230,7 +247,6 @@ export default function EventDetailScreen() {
                 }
               }
 
-              // Remaining GKs → treat as field players
               while (goalkeepers.length) {
                 const gk = goalkeepers.shift();
                 const minIndex = teams.reduce(
@@ -242,8 +258,7 @@ export default function EventDetailScreen() {
                 notes[minIndex] = "Extra GK - played as field player - Rotation!";
               }
 
-              // Assign field players, keeping all groups balanced
-              for (const player of others) {
+              for (const player of fieldPlayers) {
                 const minIndex = teams.reduce(
                   (minIdx, t, idx, arr) =>
                     t.length < arr[minIdx].length ? idx : minIdx,
@@ -252,7 +267,6 @@ export default function EventDetailScreen() {
                 teams[minIndex].push(`${player.name} (${player.position})`);
               }
 
-              // Build final structure
               for (let i = 0; i < count; i++) {
                 const groupName = `Group ${i + 1}`;
                 grouped[groupName] = teams[i];
@@ -270,6 +284,7 @@ export default function EventDetailScreen() {
       "numeric"
     );
   };
+
 
 
   if (loading) {
@@ -313,6 +328,12 @@ export default function EventDetailScreen() {
         <Text style={styles.value}>
           {new Date(event.date?.seconds * 1000).toDateString()}
         </Text>
+
+        <Text style={styles.label}>Time:</Text>
+        <Text style={styles.value}>
+          {new Date(event.date?.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+
 
         <Text style={styles.label}>Game Method:</Text>
         <Text style={styles.value}>{event.gameMethod}</Text>
