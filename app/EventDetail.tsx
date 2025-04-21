@@ -131,7 +131,7 @@ export default function EventDetailScreen() {
     ]);
   };
 
-  // 🔁 SKIPPING REPEATED IMPORTS AND UI SECTIONS...
+
 
   const handleCreateTeams = async () => {
     Alert.prompt(
@@ -164,24 +164,31 @@ export default function EventDetailScreen() {
                 const name = userSnap.exists() ? userSnap.data().name : uid;
                 const survey = surveySnap.exists() ? surveySnap.data() : {};
 
-                let positions = survey.positions || [];
+                let positionsTemp = survey.positionsTemp || [];
                 let lastPlayed = survey.lastPositionPlayed || [];
+                let updated = false;
 
-                // If empty, refill positions from lastPlayed (like a queue)
-                if (!positions.length && lastPlayed?.length) {
-                  positions = [...lastPlayed];
+                // Step 1: If positionsTemp is empty, refill it from LLP and clear LLP
+                if (positionsTemp.length === 0 && lastPlayed.length > 0) {
+                  positionsTemp = [...lastPlayed];
                   lastPlayed = [];
+                  updated = true;
                 }
 
-                // Assign current position (peek front)
-                const chosen = positions[0];
+                // Step 2: Take the first position
+                const chosen = positionsTemp[0] || "Unknown";
 
-                // If time has passed, rotate position to lastPlayed
-                if (new Date() >= eventTime && chosen) {
+                // Step 3: Only if the match time has passed → rotate position
+                if (method === "Optimization" && new Date() >= eventTime && chosen !== "Unknown") {
                   lastPlayed.push(chosen);
-                  positions = positions.slice(1);
+                  positionsTemp = positionsTemp.slice(1);
+                  updated = true;
+                }
+
+                // Step 4: If any changes were made, update Firestore
+                if (updated) {
                   await updateDoc(surveyRef, {
-                    positions,
+                    positionsTemp,
                     lastPositionPlayed: lastPlayed,
                   });
                 }
@@ -519,3 +526,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+

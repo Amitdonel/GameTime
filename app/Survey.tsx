@@ -106,21 +106,44 @@ export default function SurveyScreen() {
   };
 
   const handleSubmit = async () => {
-    if (positions.length === 0 || !skillLevel || !stamina || !fieldType || !playFrequency || !playRadius) {
+    if (
+      positions.length === 0 ||
+      !skillLevel ||
+      !stamina ||
+      !fieldType ||
+      !playFrequency ||
+      !playRadius
+    ) {
       Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
       return;
     }
-
+  
     const user = getAuth().currentUser;
-
     if (!user) {
       Alert.alert("Error", "User not authenticated");
       return;
     }
-
+  
     try {
-      await setDoc(doc(db, "surveys", user.uid), {
-        positions,
+      const docRef = doc(db, "surveys", user.uid);
+      const docSnap = await getDoc(docRef);
+      const existingData = docSnap.exists() ? docSnap.data() : {};
+  
+      let updatedPositionsTemp = existingData.positionsTemp || [...positions];
+      const lastPositionPlayed = existingData.lastPositionPlayed || [];
+  
+      // Add any newly selected positions to positionsTemp only if not in temp or LPP
+      for (const pos of positions) {
+        if (
+          !updatedPositionsTemp.includes(pos) &&
+          !lastPositionPlayed.includes(pos)
+        ) {
+          updatedPositionsTemp.push(pos);
+        }
+      }
+  
+      const payload = {
+        positions, // static preferred positions
         skillLevel,
         stamina,
         fieldType,
@@ -128,9 +151,13 @@ export default function SurveyScreen() {
         playRadius,
         dob: dob.toISOString(),
         location,
-      });
-
-      Alert.alert("Success", "Survey submitted successfully!", [
+        positionsTemp: updatedPositionsTemp,
+        lastPositionPlayed,
+      };
+  
+      await setDoc(docRef, { ...existingData, ...payload });
+  
+      Alert.alert("Success", "Survey updated successfully!", [
         {
           text: "OK",
           onPress: () => {
@@ -146,6 +173,7 @@ export default function SurveyScreen() {
       Alert.alert("Error", error.message || "An error occurred while saving survey.");
     }
   };
+  
 
   return (
     <ImageBackground source={backgroundImage} style={styles.background}>
