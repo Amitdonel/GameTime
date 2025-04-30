@@ -97,7 +97,8 @@ export default function PlusScreen() {
         description,
         image: selectedImage,
         createdBy: getAuth().currentUser?.uid || null,
-        players: [getAuth().currentUser?.uid],
+        players: [], // No one joins yet
+        playerPositions: {}, // Optional: also initialize positions clean
       });
 
       Alert.alert("Success", "Event created successfully!", [

@@ -25,6 +25,7 @@ export default function MyEventsScreen() {
 
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
+  const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const user = getAuth().currentUser;
   const router = useRouter();
@@ -33,8 +34,9 @@ export default function MyEventsScreen() {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, "events"));
-      const allEvents = snapshot.docs.map(doc => ({ ...(doc.data() as Omit<Event, "id">), id: doc.id }));
-      const myEvents = allEvents.filter(event => user?.uid && event.players?.includes(user.uid));
+      const events = snapshot.docs.map(doc => ({ ...(doc.data() as Omit<Event, "id">), id: doc.id }));
+      const myEvents = events.filter(event => user?.uid && event.players?.includes(user.uid));
+      setAllEvents(events);
 
       const now = Date.now();
       const upcoming = myEvents
@@ -108,14 +110,6 @@ export default function MyEventsScreen() {
     </TouchableOpacity>
   );
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1877F2" />
-      </View>
-    );
-  }
-
   return (
     <View style={{ flex: 1 }}>
       <FlatList
@@ -140,7 +134,7 @@ export default function MyEventsScreen() {
               ))}
             </View>
           ) : null
-        }        
+        }
         ListEmptyComponent={
           <Text style={styles.empty}>No events found.</Text>
         }

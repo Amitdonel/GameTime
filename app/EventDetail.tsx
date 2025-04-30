@@ -16,6 +16,8 @@ import {
   arrayUnion,
   arrayRemove,
   deleteDoc,
+  getDocs,
+  collection,
 } from "firebase/firestore";
 import { db } from "../app/firebaseConfig";
 import { getAuth } from "firebase/auth";
@@ -27,6 +29,7 @@ export default function EventDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [isManager, setIsManager] = useState(false);
   const [isComing, setIsComing] = useState(false);
+  const [joining, setJoining] = useState(false); // Added joining state
   const [playerNames, setPlayerNames] = useState<string[]>([]);
   const [teams, setTeams] = useState<Record<string, string[]> | null>(null);
   const user = getAuth().currentUser;
@@ -72,24 +75,87 @@ export default function EventDetailScreen() {
 
   const handleJoin = async () => {
     if (!eventId || !user) return;
-    if ((event.players?.length || 0) >= event.maxPlayers && !isComing) {
+    if ((event.players?.length || 0) >= event.maxPlayers) {
       Alert.alert("Match is Full", "No more players can join.");
+      return;
+    }
+    if (isComing) {
+      Alert.alert("Already Confirmed", "You have already joined this match.");
       return;
     }
 
     try {
+      setJoining(true); // 🔥 START LOADING
+      // 👇 Check if user has another event on the same date
+      const allEventsSnap = await getDocs(collection(db, "events"));
+      const sameDayEvents = allEventsSnap.docs
+        .map(doc => doc.data())
+        .filter(e =>
+          e.players?.includes(user.uid) &&
+          new Date(e.date.seconds * 1000).toDateString() === new Date(event.date.seconds * 1000).toDateString()
+        );
+
+      if (sameDayEvents.length > 0) {
+        Alert.alert("Conflict", "You already joined another match on the same date.");
+        setJoining(false);
+        return;
+      }
+
       const ref = doc(db, "events", eventId);
-      await updateDoc(ref, { players: arrayUnion(user.uid) });
+      const userRef = doc(db, "users", user.uid);
+      const surveyRef = doc(db, "surveys", user.uid);
+
+      const [userSnap, surveySnap] = await Promise.all([
+        getDoc(userRef),
+        getDoc(surveyRef),
+      ]);
+
+      if (!userSnap.exists() || !surveySnap.exists()) {
+        console.error("User or survey not found");
+        setJoining(false);
+        return;
+      }
+
+      const userName = userSnap.data().name || "Unknown";
+      let positionsTemp = surveySnap.data().positionsTemp || [];
+
+      if (positionsTemp.length === 0) {
+        console.error("No available positions to assign");
+        setJoining(false);
+        return;
+      }
+
+      const selectedPosition = positionsTemp[0];
+      positionsTemp = positionsTemp.slice(1).concat(selectedPosition);
+
+      await updateDoc(surveyRef, { positionsTemp });
+      await updateDoc(ref, {
+        players: arrayUnion(user.uid),
+        [`playerPositions.${user.uid}`]: selectedPosition,
+      });
+
       setIsComing(true);
       setEvent((prev: any) => ({
         ...prev,
         players: [...(prev.players || []), user.uid],
+        playerPositions: {
+          ...(prev.playerPositions || {}),
+          [user.uid]: selectedPosition,
+        },
       }));
-      setPlayerNames((prev) => [...prev, user.displayName || "You"]);
+
+      setPlayerNames((prev) => {
+        if (prev.includes(userName)) return prev;
+        return [...prev, userName];
+      });
+
     } catch (error) {
       console.error("Join failed:", error);
+    } finally {
+      setJoining(false); // 🔥 END LOADING
     }
   };
+
 
   const handleLeave = async () => {
     if (!eventId || !user) return;
@@ -149,60 +215,28 @@ export default function EventDetailScreen() {
               return;
             }
 
+            if (!event.playerPositions) {
+              Alert.alert("Error", "Player positions not available.");
+              return;
+            }
+
             const players = event.players || [];
-            const method = event.gameMethod || "Match Making";
-            const eventTime = new Date(event.date?.seconds * 1000);
+            const playerPositions = event.playerPositions || {};
 
             const playerDetails = await Promise.all(
               players.map(async (uid: string) => {
                 const userRef = doc(db, "users", uid);
-                const surveyRef = doc(db, "surveys", uid);
-                const [userSnap, surveySnap] = await Promise.all([
-                  getDoc(userRef),
-                  getDoc(surveyRef),
-                ]);
+                const userSnap = await getDoc(userRef);
                 const name = userSnap.exists() ? userSnap.data().name : uid;
-                const survey = surveySnap.exists() ? surveySnap.data() : {};
-
-                let positionsTemp = survey.positionsTemp || [];
-                let lastPlayed = survey.lastPositionPlayed || [];
-                let updated = false;
-
-                // Step 1: If positionsTemp is empty, refill it from LLP and clear LLP
-                if (positionsTemp.length === 0 && lastPlayed.length > 0) {
-                  positionsTemp = [...lastPlayed];
-                  lastPlayed = [];
-                  updated = true;
-                }
-
-                // Step 2: Take the first position
-                const chosen = positionsTemp[0] || "Unknown";
-
-                // Step 3: Only if the match time has passed → rotate position
-                if (method === "Optimization" && new Date() >= eventTime && chosen !== "Unknown") {
-                  lastPlayed.push(chosen);
-                  positionsTemp = positionsTemp.slice(1);
-                  updated = true;
-                }
-
-                // Step 4: If any changes were made, update Firestore
-                if (updated) {
-                  await updateDoc(surveyRef, {
-                    positionsTemp,
-                    lastPositionPlayed: lastPlayed,
-                  });
-                }
-
-                return {
-                  uid,
-                  name,
-                  position: chosen,
-                };
+                const position = playerPositions[uid] || "Unknown";
+                return { uid, name, position };
               })
             );
 
             const grouped: Record<string, string[]> = {};
             for (let i = 0; i < count; i++) grouped[`Group ${i + 1}`] = [];
+
+            const method = event.gameMethod || "Match Making";
 
             if (method === "Match Making") {
               const skillMap = {
@@ -222,6 +256,12 @@ export default function EventDetailScreen() {
                 })
               );
 
+              // 🔀 Shuffle first for randomness
+              for (let i = detailsWithSkills.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [detailsWithSkills[i], detailsWithSkills[j]] = [detailsWithSkills[j], detailsWithSkills[i]];
+              }
+
               detailsWithSkills.sort(
                 (a, b) =>
                   (skillMap[b.skillLevel as keyof typeof skillMap] || 1) -
@@ -229,55 +269,94 @@ export default function EventDetailScreen() {
               );
 
               const groupTotals = Array(count).fill(0);
+              const groupSizes = Array(count).fill(0);
+              const maxPerTeam = Math.floor(detailsWithSkills.length / count);
+
               for (const player of detailsWithSkills) {
                 const skill = skillMap[player.skillLevel as keyof typeof skillMap] || 1;
-                const minIndex = groupTotals.indexOf(Math.min(...groupTotals));
+                let minIndex = 0;
+                let minScore = Infinity;
+
+                for (let i = 0; i < count; i++) {
+                  if (groupSizes[i] < maxPerTeam && groupTotals[i] < minScore) {
+                    minIndex = i;
+                    minScore = groupTotals[i];
+                  }
+                }
+
                 grouped[`Group ${minIndex + 1}`].push(`${player.name} (${player.skillLevel})`);
                 groupTotals[minIndex] += skill;
+                groupSizes[minIndex]++;
               }
+
             } else {
-              // Optimization
-              const goalkeepers = playerDetails.filter((p) => p.position?.toLowerCase() === "goalkeeper");
-              const fieldPlayers = playerDetails.filter((p) => p.position?.toLowerCase() !== "goalkeeper");
+              // Optimization Method with Tactical Roles
+              const shuffle = (arr: any[]) => {
+                for (let i = arr.length - 1; i > 0; i--) {
+                  const j = Math.floor(Math.random() * (i + 1));
+                  [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+              };
 
               const totalPlayers = playerDetails.length;
               const teams: string[][] = Array.from({ length: count }, () => []);
-              const notes: Record<number, string> = {};
+              const teamSizes: number[] = Array(count).fill(0);
+              const notes: Record<number, string[]> = {};
 
-              // Assign GKs (one per group max)
+              // Split players by roles
+              let gks = playerDetails.filter((p) => p.position === "Goalkeeper");
+              let defs = playerDetails.filter((p) => p.position === "Defender");
+              let mids = playerDetails.filter((p) => p.position === "Midfielder");
+              let atts = playerDetails.filter((p) => p.position === "Attacker");
+
+              // Shuffle each role group
+              shuffle(gks);
+              shuffle(defs);
+              shuffle(mids);
+              shuffle(atts);
+
+              // Helper to find team with fewest players
+              const getSmallestTeamIndex = () => {
+                let minIndex = 0;
+                for (let i = 1; i < teamSizes.length; i++) {
+                  if (teamSizes[i] < teamSizes[minIndex]) {
+                    minIndex = i;
+                  }
+                }
+                return minIndex;
+              };
+
+              // 1. Assign 1 GK per team
               for (let i = 0; i < count; i++) {
-                const gk = goalkeepers.shift();
+                const gk = gks.shift();
                 if (gk) {
                   teams[i].push(`${gk.name} (GK)`);
+                  teamSizes[i]++;
                 } else {
-                  notes[i] = "GK own handling - Rotation!";
+                  notes[i] = notes[i] || [];
+                  notes[i].push("🧤 No GK – rotation needed");
                 }
               }
 
-              while (goalkeepers.length) {
-                const gk = goalkeepers.shift();
-                const minIndex = teams.reduce(
-                  (minIdx, t, idx, arr) =>
-                    t.length < arr[minIdx].length ? idx : minIdx,
-                  0
-                );
-                teams[minIndex].push(`${gk.name} (GK, field)`);
-                notes[minIndex] = "Extra GK - played as field player - Rotation!";
-              }
+              // 2. Assign DEF, MID, ATT positions while respecting team size
+              const assignByPosition = (players: any[], label: string) => {
+                while (players.length) {
+                  const idx = getSmallestTeamIndex();
+                  const p = players.shift();
+                  teams[idx].push(`${p.name} (${label})`);
+                  teamSizes[idx]++;
+                }
+              };
 
-              for (const player of fieldPlayers) {
-                const minIndex = teams.reduce(
-                  (minIdx, t, idx, arr) =>
-                    t.length < arr[minIdx].length ? idx : minIdx,
-                  0
-                );
-                teams[minIndex].push(`${player.name} (${player.position})`);
-              }
+              assignByPosition(defs, "DEF");
+              assignByPosition(mids, "MID");
+              assignByPosition(atts, "ATT");
 
+              // 3. Finalize groups with notes
               for (let i = 0; i < count; i++) {
                 const groupName = `Group ${i + 1}`;
                 grouped[groupName] = teams[i];
-                if (notes[i]) grouped[groupName].push(`📝 ${notes[i]}`);
+                if (notes[i]) grouped[groupName].push(...notes[i]);
               }
             }
 
@@ -291,8 +370,6 @@ export default function EventDetailScreen() {
       "numeric"
     );
   };
-
-
 
   if (loading) {
     return (
@@ -360,13 +437,14 @@ export default function EventDetailScreen() {
             style={[
               styles.button,
               styles.greenButton,
-              isFull && !isComing && styles.disabledButton,
+              (isFull && !isComing) && styles.disabledButton,
             ]}
             onPress={handleJoin}
-            disabled={isFull && !isComing}
+            disabled={(isFull && !isComing) || joining} // 🧠 add joining!
           >
             <Text style={styles.buttonText}>GameTime</Text>
           </TouchableOpacity>
+
 
           <TouchableOpacity style={[styles.button, styles.redButton]} onPress={handleLeave}>
             <Text style={styles.buttonText}>Not Coming</Text>
@@ -526,4 +604,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-

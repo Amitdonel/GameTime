@@ -118,19 +118,25 @@ export default function EditEventScreen() {
               value={eventData.date}
               mode="date"
               display="spinner"
-              onChange={(e, selectedDate) => {
+              onChange={(event, selectedDate) => {
                 if (selectedDate) {
-                  const updatedDate = new Date(eventData.date);
-                  updatedDate.setFullYear(selectedDate.getFullYear());
-                  updatedDate.setMonth(selectedDate.getMonth());
-                  updatedDate.setDate(selectedDate.getDate());
-                  setEventData({ ...eventData, date: updatedDate });
+                  const updated = new Date(eventData.date);
+                  updated.setFullYear(selectedDate.getFullYear());
+                  updated.setMonth(selectedDate.getMonth());
+                  updated.setDate(selectedDate.getDate());
+                  setEventData({ ...eventData, date: updated });
                 }
-                setDatePickerOpen(false);
               }}
             />
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => setDatePickerOpen(false)}
+            >
+              <Text style={styles.confirmButtonText}>Confirm</Text>
+            </TouchableOpacity>
           </View>
         )}
+
 
         {/* Time Picker */}
         <TouchableOpacity
@@ -148,16 +154,22 @@ export default function EditEventScreen() {
               display="spinner"
               onChange={(event, selectedTime) => {
                 if (selectedTime) {
-                  const newDate = new Date(eventData.date);
-                  newDate.setHours(selectedTime.getHours());
-                  newDate.setMinutes(selectedTime.getMinutes());
-                  setEventData({ ...eventData, date: newDate });
+                  const updated = new Date(eventData.date);
+                  updated.setHours(selectedTime.getHours());
+                  updated.setMinutes(selectedTime.getMinutes());
+                  setEventData({ ...eventData, date: updated });
                 }
-                setShowTimePicker(false);
               }}
             />
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => setShowTimePicker(false)}
+            >
+              <Text style={styles.confirmButtonText}>Confirm Time</Text>
+            </TouchableOpacity>
           </View>
         )}
+
 
         <Text style={styles.label}>Max Players: {eventData.maxPlayers}</Text>
         <Slider
@@ -355,5 +367,17 @@ const styles = StyleSheet.create({
     left: "50%",
     transform: [{ translateX: -20 }, { translateY: -40 }],
     zIndex: 999,
+  },
+  confirmButton: {
+    backgroundColor: "#1877F2",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  confirmButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
