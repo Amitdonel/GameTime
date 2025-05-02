@@ -61,7 +61,7 @@ export default function EventDetailScreen() {
 
           setPlayerNames(playerNameList);
         } else {
-          console.warn("Event not found");
+          console.warn("Event not found!");
         }
       } catch (error) {
         console.error("Error loading event:", error);
