@@ -12,7 +12,7 @@ import MapView, { Marker } from "react-native-maps";
 import Slider from "@react-native-community/slider";
 import BottomNav from "../components/BottomNav";
 import { getAuth } from "firebase/auth";
-import { db } from "../app/firebaseConfig";
+import { db } from "../functions/lib/firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 import { useRouter } from "expo-router";
 

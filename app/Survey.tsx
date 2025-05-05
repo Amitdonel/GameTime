@@ -1,4 +1,4 @@
-import { db } from "../app/firebaseConfig";
+import { db } from "../functions/lib/firebaseConfig";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
@@ -84,13 +84,13 @@ export default function SurveyScreen() {
         setDob(data.dob ? new Date(data.dob) : new Date());
         setPlayRadius(data.playRadius || 10);
         if (data.location) {
-            setLocation(data.location);
-            setRegion({
-              ...data.location,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            });
-          }          
+          setLocation(data.location);
+          setRegion({
+            ...data.location,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
+        }
       }
     };
 
@@ -117,21 +117,21 @@ export default function SurveyScreen() {
       Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
       return;
     }
-  
+
     const user = getAuth().currentUser;
     if (!user) {
       Alert.alert("Error", "User not authenticated");
       return;
     }
-  
+
     try {
       const docRef = doc(db, "surveys", user.uid);
       const docSnap = await getDoc(docRef);
       const existingData = docSnap.exists() ? docSnap.data() : {};
-  
+
       let updatedPositionsTemp = existingData.positionsTemp || [...positions];
       const lastPositionPlayed = existingData.lastPositionPlayed || [];
-  
+
       // Add any newly selected positions to positionsTemp only if not in temp or LPP
       for (const pos of positions) {
         if (
@@ -141,7 +141,7 @@ export default function SurveyScreen() {
           updatedPositionsTemp.push(pos);
         }
       }
-  
+
       const payload = {
         positions, // static preferred positions
         skillLevel,
@@ -154,17 +154,17 @@ export default function SurveyScreen() {
         positionsTemp: updatedPositionsTemp,
         lastPositionPlayed,
       };
-  
+
       await setDoc(docRef, { ...existingData, ...payload });
-  
+
       Alert.alert("Success", "Survey updated successfully!", [
         {
           text: "OK",
           onPress: () => {
             if (from === "profile") {
-              router.push("/Profile");
+              router.push("/profile");
             } else {
-              router.push("/Login");
+              router.push("/login");
             }
           },
         },
@@ -173,7 +173,7 @@ export default function SurveyScreen() {
       Alert.alert("Error", error.message || "An error occurred while saving survey.");
     }
   };
-  
+
 
   return (
     <ImageBackground source={backgroundImage} style={styles.background}>
@@ -182,7 +182,7 @@ export default function SurveyScreen() {
         <View style={styles.headerContainer}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.push(from === "profile" ? "/Profile" : "/SignUp")}
+            onPress={() => router.push(from === "profile" ? "/profile" : "/signup")}
           >
             <Text style={styles.backArrow}>←</Text>
           </TouchableOpacity>
@@ -222,25 +222,6 @@ export default function SurveyScreen() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Match Radius */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>Select your preferred match search radius (km)</Text>
-        </View>
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderValue}>{playRadius} km</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={5}
-            maximumValue={50}
-            step={5}
-            value={playRadius}
-            onValueChange={(value) => setPlayRadius(value)}
-            minimumTrackTintColor="#1877F2"
-            maximumTrackTintColor="#ddd"
-            thumbTintColor="#1877F2"
-          />
-        </View>
 
         {/* Positions */}
         <View style={styles.questionBox}>
@@ -333,12 +314,31 @@ export default function SurveyScreen() {
                   latitude: newRegion.latitude,
                   longitude: newRegion.longitude,
                 });
-              }}              
+              }}
             >
               <Marker coordinate={region} pinColor="red" />
             </MapView>
           </View>
         )}
+
+        {/* Match Radius */}
+        <View style={styles.questionBox}>
+          <Text style={styles.question}>Select your preferred match search radius (km)</Text>
+        </View>
+        <View style={styles.sliderContainer}>
+          <Text style={styles.sliderValue}>{playRadius} km</Text>
+          <Slider
+            style={styles.slider}
+            minimumValue={5}
+            maximumValue={50}
+            step={5}
+            value={playRadius}
+            onValueChange={(value) => setPlayRadius(value)}
+            minimumTrackTintColor="#1877F2"
+            maximumTrackTintColor="#ddd"
+            thumbTintColor="#1877F2"
+          />
+        </View>
 
         {/* Submit */}
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>

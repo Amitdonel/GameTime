@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "../app/firebaseConfig";
+import { auth } from "../functions/lib/firebaseConfig";
 
 // Background image
 const soccerImage = require("../assets/images/soccer.jpg");
@@ -29,7 +29,7 @@ export default function ForgotPasswordScreen() {
       Alert.alert(
         "Reset Email Sent",
         "Check your inbox for password reset instructions.",
-        [{ text: "OK", onPress: () => router.push("/Login") }]
+        [{ text: "OK", onPress: () => router.push("/login") }]
       );
     } catch (error: any) {
       Alert.alert("Error", error.message || "Something went wrong.");
@@ -58,7 +58,7 @@ export default function ForgotPasswordScreen() {
 
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.push("/Login")}
+          onPress={() => router.push("/login")}
         >
           <Text style={styles.backButtonText}>Back to Login</Text>
         </TouchableOpacity>

@@ -1,8 +1,11 @@
-// Import necessary functions from Firebase
+// Firebase core
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
+
+// ✅ Auth with persistence for React Native
+import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Firebase config
 const firebaseConfig = {
@@ -15,14 +18,18 @@ const firebaseConfig = {
   measurementId: "G-1YFRN6FF23",
 };
 
-// Initialize Firebase
+// Initialize app
 const app = initializeApp(firebaseConfig);
 
-// Export services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// ✅ Initialize Auth with persistence
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
 
-// ✅ Wrap analytics in isSupported to avoid crash
+// Firestore
+const db = getFirestore(app);
+
+// Analytics (web only, but safe with isSupported)
 let analytics;
 isSupported().then((supported) => {
   if (supported) {
@@ -30,6 +37,5 @@ isSupported().then((supported) => {
   }
 });
 
-// Optional export for app
-export { app };
-
+// Exports
+export { app, auth, db };

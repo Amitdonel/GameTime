@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { db } from "../app/firebaseConfig";
+import { db } from "../functions/lib/firebaseConfig";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
 import MapView from "react-native-maps";
 import * as Location from "expo-location";
@@ -102,7 +102,7 @@ export default function PlusScreen() {
       });
 
       Alert.alert("Success", "Event created successfully!", [
-        { text: "OK", onPress: () => router.push("/Home") },
+        { text: "OK", onPress: () => router.push("/home") },
       ]);
     } catch (error) {
       console.error("Error creating event:", error);

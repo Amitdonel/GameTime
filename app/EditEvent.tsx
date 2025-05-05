@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
-import { db } from "../app/firebaseConfig";
+import { db } from "../functions/lib/firebaseConfig";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import MapView from "react-native-maps";
 import Slider from "@react-native-community/slider";
@@ -78,7 +78,7 @@ export default function EditEventScreen() {
         image: eventData.image,
       });
       Alert.alert("Success", "Event updated!");
-      router.push(`/EventDetail?eventId=${eventId}`);
+      router.push({ pathname: "/eventdetail", params: { eventId } });
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Could not save event.");

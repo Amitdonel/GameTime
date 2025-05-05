@@ -1,9 +1,9 @@
-import { auth } from "../app/firebaseConfig";
+import { auth } from "../functions/lib/firebaseConfig";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { doc, setDoc } from "firebase/firestore";
-import { db } from "../app/firebaseConfig"; // adjust if needed
+import { db } from "../functions/lib/firebaseConfig"; // adjust if needed
 import {
   Text,
   View,
@@ -44,7 +44,7 @@ export default function SignUpScreen() {
       });
   
       Alert.alert("Success", "Account created successfully!", [
-        { text: "OK", onPress: () => router.push("/Survey") },
+        { text: "OK", onPress: () => router.push("/survey") },
       ]);
     } catch (error) {
       if (error instanceof Error) {
@@ -108,7 +108,7 @@ export default function SignUpScreen() {
 
         {/* Full-Width Boxed Login Option */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.loginButtonBox} onPress={() => router.push("/Login")}>
+          <TouchableOpacity style={styles.loginButtonBox} onPress={() => router.push("/login")}>
             <Text style={styles.loginButtonText}>Already have an account? Log in</Text>
           </TouchableOpacity>
         </View>

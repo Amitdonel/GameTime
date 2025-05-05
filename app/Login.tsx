@@ -1,4 +1,4 @@
-import { auth } from "../app/firebaseConfig";
+import { auth } from "../functions/lib/firebaseConfig";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -32,7 +32,7 @@ export default function LoginScreen() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       console.log("User logged in!");
-      router.push("/Home"); // Redirect to Home
+      router.push("/home"); // Redirect to Home
     } catch (error: any) {
       Alert.alert("Login Failed", error.message);
     }
@@ -73,7 +73,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           {/* Forgot Password */}
-          <TouchableOpacity onPress={() => router.push("/ForgotPassword")}>
+          <TouchableOpacity onPress={() => router.push("/forgotpassword")}>
             <Text style={styles.forgotPassword}>Forgot password?</Text>
           </TouchableOpacity>
         </View>
@@ -81,7 +81,7 @@ export default function LoginScreen() {
 
         {/* Full-Width Boxed Sign-Up Option */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.signupButtonBox} onPress={() => router.push("/SignUp")}>
+          <TouchableOpacity style={styles.signupButtonBox} onPress={() => router.push("/signup")}>
             <Text style={styles.signupButtonText}>Create new account</Text>
           </TouchableOpacity>
         </View>

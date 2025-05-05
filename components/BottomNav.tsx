@@ -8,19 +8,19 @@ export default function BottomNav() {
 
   return (
     <View style={styles.bottomNav}>
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Home")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/home")}>
         <Ionicons name="home" size={35} color="#1877F2" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Plus")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/plus")}>
         <Ionicons name="add-circle" size={35} color="#1877F2" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Search")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/search")}>
         <Ionicons name="search" size={35} color="#000000" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/MyEvents")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/myevents")}>
         <Ionicons name="people" size={35} color="#1877F2" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Settings")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/settings")}>
         <Ionicons name="settings" size={35} color="#1877F2" />
       </TouchableOpacity>
     </View>

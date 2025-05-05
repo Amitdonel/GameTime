@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import BottomNav from "../components/BottomNav";
-import { db } from "../app/firebaseConfig";
+import { db } from "../functions/lib/firebaseConfig";
 import { getAuth } from "firebase/auth";
 import { collection, getDocs, updateDoc, doc, arrayRemove } from "firebase/firestore";
 import { useRouter } from "expo-router";
@@ -91,7 +91,7 @@ export default function MyEventsScreen() {
   }) => (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => router.push(`/EventDetail?eventId=${item.id}`)}
+      onPress={() => router.push(`/eventdetail?eventId=${item.id}`)}
     >
       <Text style={styles.title}>{item.name}</Text>
       <Text style={styles.subtitle}>

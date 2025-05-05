@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { getAuth, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../app/firebaseConfig";
+import { db } from "../functions/lib/firebaseConfig";
 import BottomNav from "../components/BottomNav";
 
 export default function ProfileScreen() {
@@ -29,7 +29,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       await signOut(getAuth());
-      router.push("/Login"); // Redirect to login page
+      router.push("/login"); // Redirect to login page
     } catch (error) {
       console.error("Error signing out: ", error);
       Alert.alert("Error", "Could not sign out. Please try again.");
@@ -51,7 +51,7 @@ export default function ProfileScreen() {
       {/* Edit Survey Button */}
       <TouchableOpacity
         style={styles.editSurveyButton}
-        onPress={() => router.push({ pathname: "/Survey", params: { from: "profile" } })}
+        onPress={() => router.push({ pathname: "/survey", params: { from: "profile" } })}
       >
         <Text style={styles.editSurveyText}>Edit My Survey</Text>
       </TouchableOpacity>

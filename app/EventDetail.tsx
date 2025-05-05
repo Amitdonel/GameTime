@@ -19,7 +19,7 @@ import {
   getDocs,
   collection,
 } from "firebase/firestore";
-import { db } from "../app/firebaseConfig";
+import { db } from "../functions/lib/firebaseConfig";
 import { getAuth } from "firebase/auth";
 import BottomNav from "../components/BottomNav";
 
@@ -187,7 +187,7 @@ export default function EventDetailScreen() {
             const ref = doc(db, "events", eventId);
             await deleteDoc(ref);
             Alert.alert("Event deleted", "The event has been successfully canceled.");
-            router.push("/Home");
+            router.push("/home");
           } catch (err) {
             console.error("Error deleting event:", err);
             Alert.alert("Error", "Could not delete the event.");
@@ -397,7 +397,7 @@ export default function EventDetailScreen() {
         <View style={styles.header}>
           {isManager && (
             <>
-              <TouchableOpacity onPress={() => router.push(`/EditEvent?eventId=${eventId}`)}>
+              <TouchableOpacity onPress={() => router.push(`/editevent?eventId=${eventId}`)}>
                 <Text style={styles.editText}>Edit Event</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleCancelEvent}>
