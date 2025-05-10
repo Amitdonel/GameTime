@@ -29,7 +29,7 @@ export default function ForgotPasswordScreen() {
       Alert.alert(
         "Reset Email Sent",
         "Check your inbox for password reset instructions.",
-        [{ text: "OK", onPress: () => router.push("/login") }]
+        [{ text: "OK", onPress: () => router.push("/Login") }]
       );
     } catch (error: any) {
       Alert.alert("Error", error.message || "Something went wrong.");
@@ -58,7 +58,7 @@ export default function ForgotPasswordScreen() {
 
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.push("/login")}
+          onPress={() => router.push("/Login")}
         >
           <Text style={styles.backButtonText}>Back to Login</Text>
         </TouchableOpacity>

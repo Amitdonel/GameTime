@@ -161,10 +161,10 @@ export default function SurveyScreen() {
         {
           text: "OK",
           onPress: () => {
-            if (from === "profile") {
-              router.push("/profile");
+            if (from === "Profile") {
+              router.push("/Profile");
             } else {
-              router.push("/login");
+              router.push("/Login");
             }
           },
         },
@@ -182,7 +182,7 @@ export default function SurveyScreen() {
         <View style={styles.headerContainer}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.push(from === "profile" ? "/profile" : "/signup")}
+            onPress={() => router.push(from === "Profile" ? "/Profile" : "/SignUp")}
           >
             <Text style={styles.backArrow}>←</Text>
           </TouchableOpacity>

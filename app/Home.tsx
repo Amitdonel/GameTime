@@ -105,7 +105,7 @@ export default function HomeScreen() {
     return (
       <TouchableOpacity
         style={styles.eventCard}
-        onPress={() => router.push({ pathname: "/eventdetail", params: { eventId: item.id } })}
+        onPress={() => router.push({ pathname: "/EventDetail", params: { eventId: item.id } })}
       >
         <Image source={imgSrc} style={styles.eventImage} />
         <Text style={styles.eventTitle}>{item.name}</Text>
@@ -119,7 +119,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.greeting}>Hello, {fullName}</Text>
-        <TouchableOpacity onPress={() => router.push("/profile")} style={styles.profileWrapper}>
+        <TouchableOpacity onPress={() => router.push("/Profile")} style={styles.profileWrapper}>
           <View style={styles.profileInnerWrapper}>
             <Image
               source={userImage}

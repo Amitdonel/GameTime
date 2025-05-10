@@ -102,7 +102,7 @@ export default function PlusScreen() {
       });
 
       Alert.alert("Success", "Event created successfully!", [
-        { text: "OK", onPress: () => router.push("/home") },
+        { text: "OK", onPress: () => router.push("/Home") },
       ]);
     } catch (error) {
       console.error("Error creating event:", error);

@@ -32,7 +32,7 @@ export default function LoginScreen() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       console.log("User logged in!");
-      router.push("/home"); // Redirect to Home
+      router.push("/Home"); // Redirect to Home
     } catch (error: any) {
       Alert.alert("Login Failed", error.message);
     }
@@ -73,7 +73,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           {/* Forgot Password */}
-          <TouchableOpacity onPress={() => router.push("/forgotpassword")}>
+          <TouchableOpacity onPress={() => router.push("/ForgotPassword")}>
             <Text style={styles.forgotPassword}>Forgot password?</Text>
           </TouchableOpacity>
         </View>
@@ -81,7 +81,7 @@ export default function LoginScreen() {
 
         {/* Full-Width Boxed Sign-Up Option */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.signupButtonBox} onPress={() => router.push("/signup")}>
+          <TouchableOpacity style={styles.signupButtonBox} onPress={() => router.push("/SignUp")}>
             <Text style={styles.signupButtonText}>Create new account</Text>
           </TouchableOpacity>
         </View>

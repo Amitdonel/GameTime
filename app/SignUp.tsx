@@ -44,7 +44,7 @@ export default function SignUpScreen() {
       });
   
       Alert.alert("Success", "Account created successfully!", [
-        { text: "OK", onPress: () => router.push("/survey") },
+        { text: "OK", onPress: () => router.push("/Survey") },
       ]);
     } catch (error) {
       if (error instanceof Error) {
@@ -108,7 +108,7 @@ export default function SignUpScreen() {
 
         {/* Full-Width Boxed Login Option */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.loginButtonBox} onPress={() => router.push("/login")}>
+          <TouchableOpacity style={styles.loginButtonBox} onPress={() => router.push("/Login")}>
             <Text style={styles.loginButtonText}>Already have an account? Log in</Text>
           </TouchableOpacity>
         </View>

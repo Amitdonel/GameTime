@@ -78,7 +78,7 @@ export default function EditEventScreen() {
         image: eventData.image,
       });
       Alert.alert("Success", "Event updated!");
-      router.push({ pathname: "/eventdetail", params: { eventId } });
+      router.push({ pathname: "/EventDetail", params: { eventId } });
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Could not save event.");

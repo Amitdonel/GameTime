@@ -29,7 +29,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       await signOut(getAuth());
-      router.push("/login"); // Redirect to login page
+      router.push("/Login"); // Redirect to login page
     } catch (error) {
       console.error("Error signing out: ", error);
       Alert.alert("Error", "Could not sign out. Please try again.");
@@ -51,7 +51,7 @@ export default function ProfileScreen() {
       {/* Edit Survey Button */}
       <TouchableOpacity
         style={styles.editSurveyButton}
-        onPress={() => router.push({ pathname: "/survey", params: { from: "profile" } })}
+        onPress={() => router.push({ pathname: "/Survey", params: { from: "Profile" } })}
       >
         <Text style={styles.editSurveyText}>Edit My Survey</Text>
       </TouchableOpacity>

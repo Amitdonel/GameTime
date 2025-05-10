@@ -91,7 +91,7 @@ export default function MyEventsScreen() {
   }) => (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => router.push(`/eventdetail?eventId=${item.id}`)}
+      onPress={() => router.push(`/EventDetail?eventId=${item.id}`)}
     >
       <Text style={styles.title}>{item.name}</Text>
       <Text style={styles.subtitle}>
