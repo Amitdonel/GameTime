@@ -326,13 +326,32 @@ export default function EventDetailScreen() {
                 return minIndex;
               };
 
-              // 1. Assign 1 GK per team
-              for (let i = 0; i < count; i++) {
-                const gk = gks.shift();
-                if (gk) {
+              // ✅ Enhanced GK logic as agreed
+              if (gks.length === count) {
+                for (let i = 0; i < count; i++) {
+                  const gk = gks.shift();
                   teams[i].push(`${gk.name} (GK)`);
                   teamSizes[i]++;
-                } else {
+                }
+              } else if (gks.length > count) {
+                for (let i = 0; i < count; i++) {
+                  const gk = gks.shift();
+                  teams[i].push(`${gk.name} (GK)`);
+                  teamSizes[i]++;
+                }
+                gks.forEach((gk) => {
+                  const idx = getSmallestTeamIndex();
+                  teams[idx].push(`${gk.name} (GK, field)`);
+                  teamSizes[idx]++;
+                  notes[idx] = notes[idx] || [];
+                  notes[idx].push("🧤 Extra GK playing as field player – Rotation required");
+                });
+              } else {
+                for (let i = 0; i < gks.length; i++) {
+                  teams[i].push(`${gks[i].name} (GK)`);
+                  teamSizes[i]++;
+                }
+                for (let i = gks.length; i < count; i++) {
                   notes[i] = notes[i] || [];
                   notes[i].push("🧤 No GK – rotation needed");
                 }
@@ -359,6 +378,7 @@ export default function EventDetailScreen() {
                 if (notes[i]) grouped[groupName].push(...notes[i]);
               }
             }
+
 
             await updateDoc(doc(db, "events", eventId), { teams: grouped });
             setTeams(grouped);
