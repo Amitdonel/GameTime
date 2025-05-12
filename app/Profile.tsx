@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { getAuth, signOut } from "firebase/auth";
@@ -9,7 +9,7 @@ import BottomNav from "../components/BottomNav";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [userName, setUserName] = useState("Loading...");
+  const [userName, setUserName] = useState("Player");
   const anonymousImage = { uri: "https://via.placeholder.com/100" };
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       await signOut(getAuth());
-      router.push("/Login"); // Redirect to login page
+      router.push("/Login");
     } catch (error) {
       console.error("Error signing out: ", error);
       Alert.alert("Error", "Could not sign out. Please try again.");
@@ -37,29 +37,42 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Profile Avatar */}
-      <View style={styles.avatarWrapper}>
-        <Image source={anonymousImage} style={styles.avatar} />
-        <View style={styles.overlayCenter}>
-          <Ionicons name="person" size={44} color="white" />
+    <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.headerBackground}>
+          <Image source={anonymousImage} style={styles.avatar} />
         </View>
-      </View>
-      <Text style={styles.title}>{userName}</Text>
+        <Text style={styles.title}>Hi, {userName}!</Text>
+        <Text style={styles.subtitle}>Welcome back to GameTime</Text>
 
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>12</Text>
+            <Text style={styles.statLabel}>Matches</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>4</Text>
+            <Text style={styles.statLabel}>Managed</Text>
+          </View>
+        </View>
 
-      {/* Edit Survey Button */}
-      <TouchableOpacity
-        style={styles.editSurveyButton}
-        onPress={() => router.push({ pathname: "/Survey", params: { from: "Profile" } })}
-      >
-        <Text style={styles.editSurveyText}>Edit My Survey</Text>
-      </TouchableOpacity>
-
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
+        {/* Actions */}
+        <View style={styles.actionCard}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => router.push({ pathname: "/Survey", params: { from: "Profile" } })}>
+            <Ionicons name="create-outline" size={20} color="#1877F2" />
+            <Text style={styles.actionText}>Edit Survey</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => router.push("/ForgotPassword")}>
+            <Ionicons name="lock-closed-outline" size={20} color="#1877F2" />
+            <Text style={styles.actionText}>Change Password</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#dc3545" />
+            <Text style={[styles.actionText, { color: "#dc3545" }]}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       <BottomNav />
     </View>
@@ -67,87 +80,73 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  scrollContent: { paddingBottom: 100 },
+  headerBackground: {
+    backgroundColor: "#1877F2",
+    height: 180,
+    justifyContent: "flex-end",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
-    paddingTop: 80,
+    paddingBottom: 50,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
-  avatarWrapper: {
+  avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    overflow: "hidden",
-    backgroundColor: "#ddd",
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-
-  avatar: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-
-  overlayCenter: {
+    borderWidth: 3,
+    borderColor: "white",
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 2,
+    top: 120,
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 10,
+    textAlign: "center",
+    marginTop: 60,
+    color: "#1877F2",
   },
-  todo: {
-    color: "#888",
-    fontStyle: "italic",
+  subtitle: {
+    textAlign: "center",
+    color: "#555",
     marginBottom: 30,
   },
-  editSurveyButton: {
-    backgroundColor: "#1877F2",
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 10,
-    marginBottom: 40,
-  },
-  editSurveyText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  logoutButton: {
-    backgroundColor: "#dc3545",
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 10,
-    marginBottom: 40,
-  },
-  logoutText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  bottomNav: {
+  statsRow: {
     flexDirection: "row",
     justifyContent: "space-around",
-    width: "100%",
-    paddingVertical: 30,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderTopColor: "#ddd",
-    position: "absolute",
-    bottom: 0,
+    marginBottom: 30,
   },
-  navItem: {
+  statItem: {
     alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1877F2",
+  },
+  statLabel: {
+    fontSize: 14,
+    color: "#555",
+  },
+  actionCard: {
+    backgroundColor: "#fff",
+    marginHorizontal: 20,
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  actionText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: "#1877F2",
+    fontWeight: "bold",
   },
 });

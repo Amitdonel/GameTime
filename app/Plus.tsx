@@ -97,8 +97,8 @@ export default function PlusScreen() {
         description,
         image: selectedImage,
         createdBy: getAuth().currentUser?.uid || null,
-        players: [], // No one joins yet
-        playerPositions: {}, // Optional: also initialize positions clean
+        players: [],
+        playerPositions: {},
       });
 
       Alert.alert("Success", "Event created successfully!", [
@@ -111,11 +111,11 @@ export default function PlusScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.container}>
-          <Text style={styles.title}>Create New Event</Text>
+        <Text style={styles.headerTitle}>Create New Match</Text>
 
+        <View style={styles.section}>
           <TextInput
             style={styles.input}
             placeholder="Event Name"
@@ -124,9 +124,8 @@ export default function PlusScreen() {
             onChangeText={setEventName}
           />
 
-          {/* Date Picker */}
           <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
-            <Text style={{ color: "#000" }}>{eventDate.toDateString()}</Text>
+            <Text style={styles.inputText}>{eventDate.toDateString()}</Text>
           </TouchableOpacity>
           {showDatePicker && (
             <View style={styles.datePickerContainer}>
@@ -134,22 +133,16 @@ export default function PlusScreen() {
                 value={eventDate}
                 mode="date"
                 display="spinner"
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) setEventDate(selectedDate);
-                }}
+                onChange={(event, selectedDate) => selectedDate && setEventDate(selectedDate)}
               />
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={() => setShowDatePicker(false)}
-              >
+              <TouchableOpacity style={styles.confirmButton} onPress={() => setShowDatePicker(false)}>
                 <Text style={styles.confirmButtonText}>Confirm</Text>
               </TouchableOpacity>
             </View>
           )}
 
-          {/* Time Picker */}
           <TouchableOpacity style={styles.input} onPress={() => setShowTimePicker(true)}>
-            <Text style={{ color: "#000" }}>
+            <Text style={styles.inputText}>
               {eventTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </Text>
           </TouchableOpacity>
@@ -159,20 +152,16 @@ export default function PlusScreen() {
                 value={eventTime}
                 mode="time"
                 display="spinner"
-                onChange={(event, selectedTime) => {
-                  if (selectedTime) setEventTime(selectedTime);
-                }}
+                onChange={(event, selectedTime) => selectedTime && setEventTime(selectedTime)}
               />
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={() => setShowTimePicker(false)}
-              >
+              <TouchableOpacity style={styles.confirmButton} onPress={() => setShowTimePicker(false)}>
                 <Text style={styles.confirmButtonText}>Confirm Time</Text>
               </TouchableOpacity>
             </View>
           )}
+        </View>
 
-          {/* Max Players */}
+        <View style={styles.section}>
           <Text style={styles.label}>Max Players: {maxPlayers}</Text>
           <Slider
             style={{ width: "100%", height: 40 }}
@@ -186,7 +175,6 @@ export default function PlusScreen() {
             thumbTintColor="#1877F2"
           />
 
-          {/* Game Method */}
           <Text style={styles.label}>Game Method:</Text>
           <View style={styles.radioContainer}>
             {["Match Making", "Optimization"].map((method) => (
@@ -203,7 +191,6 @@ export default function PlusScreen() {
             ))}
           </View>
 
-          {/* Description */}
           <Text style={styles.label}>Description:</Text>
           <TextInput
             style={styles.descriptionInput}
@@ -214,33 +201,32 @@ export default function PlusScreen() {
             placeholder="Write something about the match..."
             placeholderTextColor="#888"
           />
+        </View>
 
-          {/* Image Picker */}
+        <View style={styles.section}>
           <Text style={styles.label}>Choose Image:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
-            <View style={styles.imageRow}>
-              {["soccer.jpg", "soccer1.jpg", "soccer2.jpg", "soccer3.jpg"].map((img) => (
-                <TouchableOpacity key={img} onPress={() => setSelectedImage(img)} style={{ marginRight: 10 }}>
-                  <Image
-                    source={imageMap[img]}
-                    style={[
-                      styles.thumbnail,
-                      selectedImage === img && styles.selectedThumbnail,
-                    ]}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
+            {Object.keys(imageMap).map((img) => (
+              <TouchableOpacity key={img} onPress={() => setSelectedImage(img)} style={{ marginRight: 10 }}>
+                <Image
+                  source={imageMap[img]}
+                  style={[
+                    styles.thumbnail,
+                    selectedImage === img && styles.selectedThumbnail,
+                  ]}
+                />
+              </TouchableOpacity>
+            ))}
           </ScrollView>
+        </View>
 
-          {/* Map */}
-          <Text style={styles.mapLabel}>Select Event Location:</Text>
+        <View style={styles.section}>
+          <Text style={styles.label}>Select Event Location:</Text>
           <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
             <MapView
               style={{ flex: 1 }}
               region={region}
               onRegionChangeComplete={(newRegion) => {
-                if (!newRegion?.latitude || !newRegion?.longitude) return;
                 setRegion(newRegion);
                 setSelectedLocation({
                   latitude: newRegion.latitude,
@@ -252,11 +238,11 @@ export default function PlusScreen() {
               <Ionicons name="location-sharp" size={40} color="red" />
             </View>
           </View>
-
-          <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
-            <Text style={styles.createButtonText}>Create Event</Text>
-          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
+          <Text style={styles.createButtonText}>Create Event</Text>
+        </TouchableOpacity>
       </ScrollView>
       <BottomNav />
     </View>
@@ -267,28 +253,35 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingBottom: 120,
   },
-  container: {
-    paddingTop: 60,
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "#f5f5f5",
-  },
-  title: {
+  headerTitle: {
     fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 20,
     color: "#1877F2",
+    textAlign: "center",
+    marginVertical: 30,
+    marginTop: 50,
+  },
+  section: {
+    width: "100%",
+    marginBottom: 20,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   input: {
     width: "100%",
     padding: 15,
-    backgroundColor: "white",
+    backgroundColor: "#f9f9f9",
     borderRadius: 10,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: "#ddd",
+  },
+  inputText: {
+    color: "#333",
+    fontSize: 16,
   },
   datePickerContainer: {
     backgroundColor: "#fff",
@@ -312,39 +305,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#1877F2",
     padding: 15,
     borderRadius: 10,
-    width: "100%",
+    width: "90%",
+    alignSelf: "center",
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 20,
   },
   createButtonText: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
   },
-  mapLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    alignSelf: "flex-start",
-    marginTop: 10,
-  },
-  pinContainer: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -20 }, { translateY: -40 }],
-    zIndex: 999,
-  },
   label: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#333",
-    alignSelf: "flex-start",
-    marginTop: 10,
+    marginBottom: 5,
   },
   radioContainer: {
     flexDirection: "row",
-    marginBottom: 10,
+    marginVertical: 10,
   },
   radioButton: {
     paddingVertical: 10,
@@ -372,10 +351,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     textAlignVertical: "top",
   },
-  imageRow: {
-    flexDirection: "row",
-    marginVertical: 10,
-  },
   thumbnail: {
     width: 100,
     height: 100,
@@ -384,5 +359,12 @@ const styles = StyleSheet.create({
   selectedThumbnail: {
     borderWidth: 3,
     borderColor: "#1877F2",
+  },
+  pinContainer: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -20 }, { translateY: -40 }],
+    zIndex: 999,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -8,25 +8,21 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, Circle, Callout } from "react-native-maps";
 import Slider from "@react-native-community/slider";
 import BottomNav from "../components/BottomNav";
-import { getAuth } from "firebase/auth";
-import { db } from "../functions/lib/firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
+import { db } from "../functions/lib/firebaseConfig";
 import { useRouter } from "expo-router";
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
-
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
-
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -40,7 +36,7 @@ export default function SearchScreen() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
-
+  const mapRef = useRef<MapView | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -77,13 +73,51 @@ export default function SearchScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Title */}
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Explore Events</Text>
+      </View>
+
       <View style={styles.mapContainer}>
         <MapView
+          ref={(ref) => {
+            mapRef.current = ref;
+          }}
           style={styles.map}
           region={region}
           onRegionChangeComplete={(newRegion) => setRegion(newRegion)}
         >
-          <Marker coordinate={region} />
+          <Marker coordinate={region} pinColor="red" />
+          <Circle
+            center={region}
+            radius={radius * 1000}
+            strokeColor="rgba(24, 119, 242, 0.5)"
+            fillColor="rgba(24, 119, 242, 0.1)"
+          />
+          {events.map((event) => (
+            <Marker
+              key={event.id}
+              coordinate={event.location}
+              pinColor="blue"
+            >
+              <Callout
+                onPress={() =>
+                  router.push({
+                    pathname: "/EventDetail",
+                    params: { eventId: event.id },
+                  } as any)
+                }
+              >
+                <View style={{ maxWidth: 200 }}>
+                  <Text style={{ fontWeight: "bold" }}>{event.name}</Text>
+                  <Text>
+                    {new Date(event.date.seconds * 1000).toDateString()}
+                  </Text>
+                  <Text>Tap here for details</Text>
+                </View>
+              </Callout>
+            </Marker>
+          ))}
         </MapView>
       </View>
 
@@ -93,9 +127,16 @@ export default function SearchScreen() {
           style={styles.slider}
           minimumValue={5}
           maximumValue={50}
-          step={1}
+          step={5}
           value={radius}
-          onValueChange={setRadius}
+           onValueChange={(value) => {
+    setRadius(value);
+    setRegion((prev) => ({
+      ...prev,
+      latitudeDelta: value / 50,
+      longitudeDelta: value / 50,
+    }));
+  }}
           minimumTrackTintColor="#1877F2"
           maximumTrackTintColor="#ddd"
           thumbTintColor="#1877F2"
@@ -119,7 +160,6 @@ export default function SearchScreen() {
                 pathname: "/EventDetail",
                 params: { eventId: item.id },
               } as any)}
-              
             >
               <Text style={styles.title}>{item.name}</Text>
               <Text style={styles.subtitle}>
@@ -137,6 +177,17 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    paddingTop: 50,
+    paddingBottom: 10,
+    backgroundColor: "#1877F2",
+    alignItems: "center",
+  },
+  headerText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "white",
+  },
   mapContainer: {
     height: 300,
     width: "100%",

@@ -3,7 +3,7 @@ import { getAuth } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Circle, Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Slider from "@react-native-community/slider";
@@ -317,6 +317,13 @@ export default function SurveyScreen() {
               }}
             >
               <Marker coordinate={region} pinColor="red" />
+              {/* 🟢 Add the circle that updates live */}
+              <Circle
+                center={region}
+                radius={playRadius * 1000} // Radius in meters
+                strokeColor="rgba(24, 119, 242, 0.8)"
+                fillColor="rgba(24, 119, 242, 0.2)"
+              />
             </MapView>
           </View>
         )}
@@ -333,7 +340,14 @@ export default function SurveyScreen() {
             maximumValue={50}
             step={5}
             value={playRadius}
-            onValueChange={(value) => setPlayRadius(value)}
+            onValueChange={(value) => {
+              setPlayRadius(value);
+              setRegion((prev) => ({
+                ...prev,
+                latitudeDelta: value / 50,
+                longitudeDelta: value / 50,
+              }));
+            }}
             minimumTrackTintColor="#1877F2"
             maximumTrackTintColor="#ddd"
             thumbTintColor="#1877F2"

@@ -25,7 +25,6 @@ export default function MyEventsScreen() {
 
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
-  const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const user = getAuth().currentUser;
   const router = useRouter();
@@ -36,12 +35,11 @@ export default function MyEventsScreen() {
       const snapshot = await getDocs(collection(db, "events"));
       const events = snapshot.docs.map(doc => ({ ...(doc.data() as Omit<Event, "id">), id: doc.id }));
       const myEvents = events.filter(event => user?.uid && event.players?.includes(user.uid));
-      setAllEvents(events);
 
       const now = Date.now();
       const upcoming = myEvents
         .filter(e => e.date.seconds * 1000 >= now)
-        .sort((a, b) => b.date.seconds - a.date.seconds);
+        .sort((a, b) => a.date.seconds - b.date.seconds);
       const past = myEvents
         .filter(e => e.date.seconds * 1000 < now)
         .sort((a, b) => b.date.seconds - a.date.seconds);
@@ -73,7 +71,7 @@ export default function MyEventsScreen() {
             await updateDoc(ref, {
               players: arrayRemove(user.uid),
             });
-            fetchMyEvents(); // Refresh list
+            fetchMyEvents();
           } catch (err) {
             console.error("Failed to leave event:", err);
           }
@@ -82,13 +80,7 @@ export default function MyEventsScreen() {
     ]);
   };
 
-  const renderEvent = ({
-    item,
-    showLeaveButton = false,
-  }: {
-    item: Event;
-    showLeaveButton?: boolean;
-  }) => (
+  const renderEvent = (item: Event, showLeaveButton: boolean) => (
     <TouchableOpacity
       style={styles.card}
       onPress={() => router.push(`/EventDetail?eventId=${item.id}`)}
@@ -111,34 +103,42 @@ export default function MyEventsScreen() {
   );
 
   return (
-    <View style={{ flex: 1 }}>
-      <FlatList
-        ListHeaderComponent={
-          <View style={styles.section}>
-            <Text style={styles.mainTitle}>My Events</Text>
-            {upcomingEvents.length > 0 && (
+    <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+      <Text style={styles.mainTitle}>My Events</Text>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1877F2" />
+        </View>
+      ) : (
+        <FlatList
+          data={upcomingEvents}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.container}
+          ListHeaderComponent={
+            upcomingEvents.length > 0 ? (
               <Text style={styles.sectionTitle}>Upcoming Events</Text>
-            )}
-          </View>
-        }
-        data={upcomingEvents}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.container}
-        renderItem={({ item }) => renderEvent({ item, showLeaveButton: true })}
-        ListFooterComponent={
-          pastEvents.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Past Events</Text>
-              {pastEvents.map((event) => (
-                <View key={event.id}>{renderEvent({ item: event })}</View>
-              ))}
-            </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          <Text style={styles.empty}>No events found.</Text>
-        }
-      />
+            ) : null
+          }
+          renderItem={({ item }) => renderEvent(item, true)}
+          ListFooterComponent={
+            pastEvents.length > 0 ? (
+              <>
+                <Text style={styles.sectionTitle}>Past Events</Text>
+                {pastEvents.map((event) => (
+                  <View key={event.id} style={{ marginBottom: 10 }}>
+                    {renderEvent(event, false)}
+                  </View>
+                ))}
+              </>
+            ) : null
+          }
+          ListEmptyComponent={
+            <Text style={styles.empty}>You haven't joined any events yet.</Text>
+          }
+        />
+      )}
+
       <BottomNav />
     </View>
   );
@@ -146,41 +146,38 @@ export default function MyEventsScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 80,
-    backgroundColor: "#f5f5f5",
-    paddingHorizontal: 15,
+    padding: 20,
+    paddingBottom: 100,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  section: {
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingTop: 100,
   },
   mainTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "bold",
     color: "#1877F2",
     textAlign: "center",
-    marginBottom: 10,
+    marginTop: 50,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#555",
-    marginTop: 20,
+    color: "#333",
     marginBottom: 10,
+    marginTop: 20,
   },
   card: {
     backgroundColor: "#fff",
     padding: 15,
     borderRadius: 10,
-    marginBottom: 15,
-    elevation: 3,
     borderWidth: 1,
     borderColor: "#ddd",
+    marginBottom: 15,
+    elevation: 2,
   },
   title: {
     fontSize: 18,
@@ -206,7 +203,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   leaveText: {
-    color: "#fff",
+    color: "white",
     fontWeight: "bold",
     fontSize: 13,
   },
