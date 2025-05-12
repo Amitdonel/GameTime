@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useCallback } from "react";
 import {
   View,
   Text,
@@ -18,6 +19,7 @@ import {
   deleteDoc,
   getDocs,
   collection,
+  addDoc,
 } from "firebase/firestore";
 import { db } from "../functions/lib/firebaseConfig";
 import { getAuth } from "firebase/auth";
@@ -75,18 +77,21 @@ export default function EventDetailScreen() {
 
   const handleJoin = async () => {
     if (!eventId || !user) return;
+
     if ((event.players?.length || 0) >= event.maxPlayers) {
       Alert.alert("Match is Full", "No more players can join.");
       return;
     }
+
     if (isComing) {
       Alert.alert("Already Confirmed", "You have already joined this match.");
       return;
     }
 
     try {
-      setJoining(true); // 🔥 START LOADING
-      // 👇 Check if user has another event on the same date
+      setJoining(true);
+
+      // Check for conflict on same date
       const allEventsSnap = await getDocs(collection(db, "events"));
       const sameDayEvents = allEventsSnap.docs
         .map(doc => doc.data())
@@ -149,12 +154,37 @@ export default function EventDetailScreen() {
         return [...prev, userName];
       });
 
+      // ✅ Only now send the notifications — AFTER successful join
+      await addDoc(collection(db, "notifications"), {
+        toUser: event.createdBy,
+        type: "player-joined",
+        eventId,
+        eventName: event.name,
+        timestamp: Date.now(),
+        read: false,
+      });
+
+      // Check if now it's full (after the join)
+      const updatedEventSnap = await getDoc(ref);
+      const updatedEventData = updatedEventSnap.data();
+      if (updatedEventData && (updatedEventData.players?.length || 0) >= updatedEventData.maxPlayers) {
+        await addDoc(collection(db, "notifications"), {
+          toUser: event.createdBy,
+          type: "match-full",
+          eventId,
+          eventName: event.name,
+          timestamp: Date.now(),
+          read: false,
+        });
+      }
+
     } catch (error) {
       console.error("Join failed:", error);
     } finally {
-      setJoining(false); // 🔥 END LOADING
+      setJoining(false);
     }
   };
+
 
 
   const handleLeave = async () => {
@@ -163,6 +193,7 @@ export default function EventDetailScreen() {
     try {
       const ref = doc(db, "events", eventId);
       await updateDoc(ref, { players: arrayRemove(user.uid) });
+
       setIsComing(false);
       setEvent((prev: any) => ({
         ...prev,
@@ -171,12 +202,25 @@ export default function EventDetailScreen() {
       setPlayerNames((prev) =>
         prev.filter((name) => name !== (user.displayName || "You"))
       );
+
+      // ✅ Notify manager after successful leave
+      await addDoc(collection(db, "notifications"), {
+        toUser: event.createdBy,
+        type: "player-left",
+        eventId,
+        eventName: event.name,
+        timestamp: Date.now(),
+        read: false,
+      });
+
     } catch (error) {
       console.error("Leave failed:", error);
     }
   };
 
-  const handleCancelEvent = async () => {
+
+
+  const handleCancelEvent = useCallback(() => {
     Alert.alert("Are you sure?", "This will permanently delete the event.", [
       { text: "Cancel", style: "cancel" },
       {
@@ -195,7 +239,8 @@ export default function EventDetailScreen() {
         },
       },
     ]);
-  };
+  }, [eventId]);
+
 
 
 
@@ -382,6 +427,20 @@ export default function EventDetailScreen() {
 
             await updateDoc(doc(db, "events", eventId), { teams: grouped });
             setTeams(grouped);
+            // ✅ Notify all players the teams were created
+            const playersToNotify = (event.players || []).filter((uid: string) => user && uid !== user.uid);
+            const notificationsBatch = playersToNotify.map((playerUid: string) =>
+              addDoc(collection(db, "notifications"), {
+                toUser: playerUid,
+                type: "teams-created",
+                eventId,
+                eventName: event.name,
+                timestamp: Date.now(),
+                read: false,
+              })
+            );
+            await Promise.all(notificationsBatch);
+
           },
         },
       ],
@@ -423,6 +482,7 @@ export default function EventDetailScreen() {
               <TouchableOpacity onPress={handleCancelEvent}>
                 <Text style={[styles.editText, styles.cancelText]}>Cancel Event</Text>
               </TouchableOpacity>
+
             </>
           )}
         </View>

@@ -1,7 +1,7 @@
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useEffect, useState } from "react";
 import { getAuth } from "firebase/auth";
-import { doc, getDoc, getDocs, collection } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, query, where } from "firebase/firestore";
 import { db } from "../functions/lib/firebaseConfig";
 import BottomNav from "../components/BottomNav";
 
@@ -25,12 +25,11 @@ const imageMap: { [key: string]: any } = {
 };
 
 export default function HomeScreen() {
-  const [userImage, setUserImage] = useState({ uri: "https://via.placeholder.com/100" });
   const [fullName, setFullName] = useState("Player");
-  const [profileReady, setProfileReady] = useState(false);
   const [yourEvents, setYourEvents] = useState<any[]>([]);
   const [pastYourEvents, setPastYourEvents] = useState<any[]>([]);
   const [nearbyEvents, setNearbyEvents] = useState<any[]>([]);
+  const [hasUnread, setHasUnread] = useState(false); // 🔴 NEW
   const router = useRouter();
   const user = getAuth().currentUser;
 
@@ -57,7 +56,6 @@ export default function HomeScreen() {
       if (userSnap.exists()) {
         const data = userSnap.data();
         setFullName(data.name || "Player");
-        if (data.photoUrl) setUserImage({ uri: data.photoUrl });
       }
 
       const surveyRef = doc(db, "surveys", user.uid);
@@ -89,7 +87,17 @@ export default function HomeScreen() {
       }
     };
 
+    const fetchUnread = async () => {
+      if (!user) return;
+      const snapshot = await getDocs(
+        query(collection(db, "notifications"), where("toUser", "==", user.uid), where("read", "==", false))
+      );
+      setHasUnread(!snapshot.empty);
+    };
+
     fetchData();
+    fetchUnread();
+
     return () => {
       isMounted = false;
     };
@@ -119,18 +127,9 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.greeting}>Hello, {fullName}</Text>
-        <TouchableOpacity onPress={() => router.push("/Profile")} style={styles.profileWrapper}>
-          <View style={styles.profileInnerWrapper}>
-            <Image
-              source={userImage}
-              style={styles.profileIcon}
-              onLoad={() => setProfileReady(true)}
-              onError={() => setProfileReady(true)}
-            />
-            {profileReady && (
-              <Ionicons name="person" size={24} color="white" style={styles.profileIconOverlay} />
-            )}
-          </View>
+        <TouchableOpacity onPress={() => router.push("/Notification")} style={{ position: 'relative' }}>
+          <Ionicons name="notifications-outline" size={30} color="white" />
+          {hasUnread && <View style={styles.redDot} />}
         </TouchableOpacity>
       </View>
 
@@ -177,28 +176,37 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5" },
   scrollContent: { paddingBottom: 120 },
   header: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20, backgroundColor: "#1877F2",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 70,
+    paddingBottom: 20,
+    backgroundColor: "#1877F2",
   },
   greeting: { fontSize: 22, fontWeight: "bold", color: "white" },
   content: { paddingHorizontal: 20, paddingTop: 20 },
   sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10, marginTop: 20, color: "#1877F2" },
   noEvents: { fontSize: 14, fontStyle: "italic", color: "#777", marginBottom: 10 },
   eventCard: {
-    backgroundColor: "white", borderRadius: 10, marginBottom: 16,
-    borderWidth: 1, borderColor: "#ddd", overflow: "hidden",
+    backgroundColor: "white",
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    overflow: "hidden",
   },
   eventImage: { width: "100%", height: 160, resizeMode: "cover" },
   eventTitle: { fontSize: 16, fontWeight: "bold", paddingHorizontal: 12, paddingTop: 10 },
   eventInfo: { fontSize: 14, paddingHorizontal: 12, paddingBottom: 4, color: "#333" },
   almostThere: { fontSize: 14, paddingHorizontal: 12, paddingBottom: 10, fontWeight: "bold", color: "#f44336" },
-  profileWrapper: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: "#ddd",
-    overflow: "hidden", justifyContent: "center", alignItems: "center",
+  redDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "red",
   },
-  profileInnerWrapper: {
-    width: 40, height: 40, borderRadius: 20, overflow: "hidden", position: "relative",
-  },
-  profileIcon: { width: 40, height: 40, borderRadius: 20, resizeMode: "cover", backgroundColor: "#ccc" },
-  profileIconOverlay: { position: "absolute", top: 8, left: 8 },
 });
