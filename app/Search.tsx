@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  TextInput,
 } from "react-native";
 import MapView, { Marker, Circle, Callout } from "react-native-maps";
 import Slider from "@react-native-community/slider";
@@ -14,6 +15,7 @@ import BottomNav from "../components/BottomNav";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../functions/lib/firebaseConfig";
 import { useRouter } from "expo-router";
+import axios from "axios";
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371;
@@ -26,8 +28,16 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+type Event = {
+  id: string;
+  name: string;
+  date: { seconds: number };
+  location: { latitude: number; longitude: number };
+  gameMethod?: string;
+};
+
 export default function SearchScreen() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState(10);
   const [region, setRegion] = useState({
@@ -36,8 +46,67 @@ export default function SearchScreen() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
+  const [searchQuery, setSearchQuery] = useState("");
+  type Suggestion = {
+    display_name: string;
+    lat: string;
+    lon: string;
+  };
+  
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const mapRef = useRef<MapView | null>(null);
   const router = useRouter();
+
+  const handleAddressChange = async (text: string) => {
+    setSearchQuery(text);
+    if (text.length < 3) return setSuggestions([]);
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${text}`,
+        {
+          headers: {
+            "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
+          },
+        }
+      );
+      setSuggestions(response.data);
+    } catch (err) {
+      console.error("Address autocomplete error:", err);
+    }
+  };
+
+  const reverseGeocode = async (lat: number, lon: number) => {
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+        {
+          headers: {
+            "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
+          },
+        }
+      );
+      if (response.data && response.data.display_name) {
+        setSearchQuery(response.data.display_name);
+      }
+    } catch (err) {
+      console.error("Reverse geocoding error:", err);
+    }
+  };
+
+  const handleSelectSuggestion = (place: Suggestion) => {
+    const newLat = parseFloat(place.lat);
+    const newLon = parseFloat(place.lon);
+    const newRegion = {
+      latitude: newLat,
+      longitude: newLon,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    };
+    setRegion(newRegion);
+    setSearchQuery(place.display_name);
+    setSuggestions([]);
+    mapRef.current?.animateToRegion(newRegion, 1000);
+  };
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -46,7 +115,7 @@ export default function SearchScreen() {
         const snapshot = await getDocs(collection(db, "events"));
         const now = Date.now();
         const upcomingEvents = snapshot.docs
-          .map((doc) => ({ ...(doc.data() as any), id: doc.id }))
+          .map((doc) => ({ ...(doc.data() as Event), id: doc.id }))
           .filter((event) => event.date?.seconds * 1000 > now && event.location);
 
         const filtered = upcomingEvents.filter((event) => {
@@ -73,7 +142,6 @@ export default function SearchScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Title */}
       <View style={styles.header}>
         <Text style={styles.headerText}>Explore Events</Text>
       </View>
@@ -85,7 +153,10 @@ export default function SearchScreen() {
           }}
           style={styles.map}
           region={region}
-          onRegionChangeComplete={(newRegion) => setRegion(newRegion)}
+          onRegionChangeComplete={(newRegion) => {
+            setRegion(newRegion);
+            reverseGeocode(newRegion.latitude, newRegion.longitude);
+          }}
         >
           <Marker coordinate={region} pinColor="red" />
           <Circle
@@ -105,7 +176,7 @@ export default function SearchScreen() {
                   router.push({
                     pathname: "/EventDetail",
                     params: { eventId: event.id },
-                  } as any)
+                  })
                 }
               >
                 <View style={{ maxWidth: 200 }}>
@@ -120,7 +191,27 @@ export default function SearchScreen() {
           ))}
         </MapView>
       </View>
-
+<View style={{ paddingHorizontal: 20, marginTop: 10 }}>
+        <TextInput
+          style={styles.input}
+          placeholder="Search for address..."
+          value={searchQuery}
+          onChangeText={handleAddressChange}
+        />
+        {suggestions.length > 0 && (
+          <View style={styles.suggestionList}>
+            {suggestions.map((place, index) => (
+              <TouchableOpacity
+                key={index}
+                onPress={() => handleSelectSuggestion(place)}
+                style={styles.suggestionItem}
+              >
+                <Text>{place.display_name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
       <View style={styles.sliderSection}>
         <Text style={styles.sliderLabel}>Search radius: {radius} km</Text>
         <Slider
@@ -129,14 +220,14 @@ export default function SearchScreen() {
           maximumValue={50}
           step={5}
           value={radius}
-           onValueChange={(value) => {
-    setRadius(value);
-    setRegion((prev) => ({
-      ...prev,
-      latitudeDelta: value / 50,
-      longitudeDelta: value / 50,
-    }));
-  }}
+          onValueChange={(value) => {
+            setRadius(value);
+            setRegion((prev) => ({
+              ...prev,
+              latitudeDelta: value / 50,
+              longitudeDelta: value / 50,
+            }));
+          }}
           minimumTrackTintColor="#1877F2"
           maximumTrackTintColor="#ddd"
           thumbTintColor="#1877F2"
@@ -159,7 +250,7 @@ export default function SearchScreen() {
               onPress={() => router.push({
                 pathname: "/EventDetail",
                 params: { eventId: item.id },
-              } as any)}
+              })}
             >
               <Text style={styles.title}>{item.name}</Text>
               <Text style={styles.subtitle}>
@@ -243,5 +334,25 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     justifyContent: "center",
     alignItems: "center",
+  },
+  input: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 10,
+    marginBottom: 10,
+  },
+  suggestionList: {
+    backgroundColor: "#fff",
+    borderColor: "#ddd",
+    borderWidth: 1,
+    borderRadius: 8,
+    maxHeight: 150,
+  },
+  suggestionItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
 });

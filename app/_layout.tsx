@@ -1,5 +1,10 @@
 import { Stack } from "expo-router";
+import { ActionSheetProvider } from "@expo/react-native-action-sheet";
 
 export default function Layout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <ActionSheetProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ActionSheetProvider>
+  );
 }

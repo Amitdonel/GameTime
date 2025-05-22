@@ -16,6 +16,9 @@ import {
   ImageBackground,
   Alert,
 } from "react-native";
+import axios from "axios";
+import { TextInput, FlatList, TouchableWithoutFeedback } from "react-native";
+
 
 const backgroundImage = require("../assets/images/soccer.jpg");
 
@@ -43,6 +46,11 @@ export default function SurveyScreen() {
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   });
+
+  const [searchQuery, setSearchQuery] = useState("");
+  type Suggestion = { display_name: string; lat: string; lon: string };
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
 
   useEffect(() => {
     (async () => {
@@ -104,6 +112,60 @@ export default function SurveyScreen() {
         : [...prevPositions, role]
     );
   };
+
+  const handleAddressChange = async (text: string) => {
+  setSearchQuery(text);
+  if (text.length < 3) return setSuggestions([]);
+
+  try {
+    const response = await axios.get(
+  `https://nominatim.openstreetmap.org/search?format=json&q=${text}`,
+  {
+    headers: {
+      "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
+    },
+  }
+);
+    setSuggestions(response.data);
+  } catch (err) {
+    console.error("Address autocomplete error:", err);
+  }
+};
+const reverseGeocode = async (lat: number, lon: number) => {
+  try {
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+      {
+        headers: {
+          "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
+        },
+      }
+    );
+    if (response.data && response.data.display_name) {
+      setSearchQuery(response.data.display_name);
+    }
+  } catch (err) {
+    console.error("Reverse geocoding failed:", err);
+  }
+};
+
+
+const handleSelectSuggestion = (place: any) => {
+  const newLat = parseFloat(place.lat);
+  const newLon = parseFloat(place.lon);
+
+  setRegion({
+    latitude: newLat,
+    longitude: newLon,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
+
+  setLocation({ latitude: newLat, longitude: newLon });
+  setSearchQuery(place.display_name);
+  setSuggestions([]);
+};
+
 
   const handleSubmit = async () => {
     if (
@@ -298,10 +360,51 @@ export default function SurveyScreen() {
           </TouchableOpacity>
         ))}
 
+        
+
+
         {/* Location */}
         <View style={styles.questionBox}>
           <Text style={styles.question}>Insert your location</Text>
         </View>
+
+        <View style={{ width: "90%", marginTop: 20 }}>
+  <TextInput
+    style={{
+      backgroundColor: "white",
+      borderColor: "#ddd",
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 10,
+    }}
+    placeholder="Search for address..."
+    value={searchQuery}
+    onChangeText={handleAddressChange}
+  />
+
+  {suggestions.length > 0 && (
+    <View
+      style={{
+        backgroundColor: "white",
+        borderColor: "#ddd",
+        borderWidth: 1,
+        borderRadius: 8,
+        marginTop: 5,
+        maxHeight: 150,
+      }}
+    >
+      {suggestions.map((place, index) => (
+        <TouchableOpacity
+          key={index}
+          onPress={() => handleSelectSuggestion(place)}
+          style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: "#eee" }}
+        >
+          <Text>{place.display_name}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  )}
+</View>
 
         {location && (
           <View style={{ width: "90%", height: 300, marginVertical: 20 }}>
@@ -310,10 +413,10 @@ export default function SurveyScreen() {
               region={region}
               onRegionChangeComplete={(newRegion) => {
                 setRegion(newRegion);
-                setLocation({
-                  latitude: newRegion.latitude,
-                  longitude: newRegion.longitude,
-                });
+                  const lat = newRegion.latitude;
+                  const lon = newRegion.longitude;
+                setLocation({ latitude: lat, longitude: lon });
+  reverseGeocode(lat, lon);
               }}
             >
               <Marker coordinate={region} pinColor="red" />

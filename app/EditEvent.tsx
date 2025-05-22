@@ -17,6 +17,7 @@ import MapView from "react-native-maps";
 import Slider from "@react-native-community/slider";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNav from "../components/BottomNav";
+import axios from "axios";
 
 export default function EditEventScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
@@ -32,6 +33,55 @@ export default function EditEventScreen() {
   const [eventData, setEventData] = useState<any>({});
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+
+  const handleAddressChange = async (text: string) => {
+    setSearchQuery(text);
+    if (text.length < 3) return setSuggestions([]);
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${text}`,
+        {
+          headers: {
+            "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
+          },
+        }
+      );
+      setSuggestions(response.data);
+    } catch (err) {
+      console.error("Address autocomplete error:", err);
+    }
+  };
+
+  const reverseGeocode = async (lat: number, lon: number) => {
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+        {
+          headers: {
+            "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
+          },
+        }
+      );
+      if (response.data && response.data.display_name) {
+        setSearchQuery(response.data.display_name);
+      }
+    } catch (err) {
+      console.error("Reverse geocoding failed:", err);
+    }
+  };
+
+  const handleSelectSuggestion = (place: any) => {
+    const newLat = parseFloat(place.lat);
+    const newLon = parseFloat(place.lon);
+    setEventData({
+      ...eventData,
+      location: { latitude: newLat, longitude: newLon },
+    });
+    setSearchQuery(place.display_name);
+    setSuggestions([]);
+  };
 
   useEffect(() => {
     if (!eventId) return;
@@ -137,8 +187,6 @@ export default function EditEventScreen() {
           </View>
         )}
 
-
-        {/* Time Picker */}
         <TouchableOpacity
           style={styles.input}
           onPress={() => setShowTimePicker(true)}
@@ -169,7 +217,6 @@ export default function EditEventScreen() {
             </TouchableOpacity>
           </View>
         )}
-
 
         <Text style={styles.label}>Max Players: {eventData.maxPlayers}</Text>
         <Slider
@@ -238,6 +285,27 @@ export default function EditEventScreen() {
           </View>
         </ScrollView>
 
+        <Text style={styles.label}>Insert Address:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Search for address..."
+          value={searchQuery}
+          onChangeText={handleAddressChange}
+        />
+        {suggestions.length > 0 && (
+          <View style={{ backgroundColor: "white", borderColor: "#ddd", borderWidth: 1, borderRadius: 8, maxHeight: 150 }}>
+            {suggestions.map((place, index) => (
+              <TouchableOpacity
+                key={index}
+                onPress={() => handleSelectSuggestion(place)}
+                style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: "#eee" }}
+              >
+                <Text>{place.display_name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <Text style={styles.label}>Event Location:</Text>
         <View style={{ width: "100%", height: 300, marginVertical: 15 }}>
           <MapView
@@ -256,6 +324,7 @@ export default function EditEventScreen() {
                   longitude: newRegion.longitude,
                 },
               });
+              reverseGeocode(newRegion.latitude, newRegion.longitude);
             }}
           />
           <View style={styles.pinContainer}>
@@ -272,6 +341,7 @@ export default function EditEventScreen() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

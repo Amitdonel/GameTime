@@ -24,6 +24,9 @@ import {
 import { db } from "../functions/lib/firebaseConfig";
 import { getAuth } from "firebase/auth";
 import BottomNav from "../components/BottomNav";
+import axios from "axios";
+import { Linking } from "react-native";
+
 
 export default function EventDetailScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
@@ -34,8 +37,12 @@ export default function EventDetailScreen() {
   const [joining, setJoining] = useState(false); // Added joining state
   const [playerNames, setPlayerNames] = useState<string[]>([]);
   const [teams, setTeams] = useState<Record<string, string[]> | null>(null);
+  const [address, setAddress] = useState("");
+  const [weather, setWeather] = useState<{ code: number; temp: number } | null>(null);
   const user = getAuth().currentUser;
   const router = useRouter();
+  const [weatherIcon, setWeatherIcon] = useState("");
+  const [weatherNote, setWeatherNote] = useState("");
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -62,6 +69,69 @@ export default function EventDetailScreen() {
           }
 
           setPlayerNames(playerNameList);
+          // Reverse geocode
+          if (data.location) {
+            try {
+              const res = await axios.get(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${data.location.latitude}&lon=${data.location.longitude}`,
+                {
+                  headers: {
+                    "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
+                  },
+                }
+              );
+              if (res.data && res.data.display_name) {
+                setAddress(res.data.display_name);
+              }
+            } catch (err) {
+              console.error("Reverse geocoding failed:", err);
+            }
+          }
+
+          // Weather
+          if (data.location && data.date?.seconds) {
+            const unixTime = data.date.seconds;
+            try {
+              const res = await axios.get(
+                `https://api.open-meteo.com/v1/forecast?latitude=${data.location.latitude}&longitude=${data.location.longitude}&hourly=temperature_2m,weathercode&start=${unixTime}&end=${unixTime + 3600}&timezone=auto`
+              );
+              const { time, temperature_2m, weathercode } = res.data.hourly;
+
+              const eventDate = new Date(unixTime * 1000);
+              const eventHourISO = eventDate.toISOString().slice(0, 13); // e.g. "2025-05-22T18"
+
+              let closestIndex = time.findIndex((t: string) => t.startsWith(eventHourISO));
+              if (closestIndex === -1) closestIndex = 0;
+
+              const code = weathercode[closestIndex];
+              const temp = temperature_2m[closestIndex];
+              setWeather({ code, temp });
+
+              // 🌦️ Map weather icon and note
+              let icon = "🌫️";
+              let note = "";
+
+              if (code === 0) {
+                icon = "☀️";
+                if (temp >= 25) note = "It's going to be hot. Stay hydrated! 💧";
+              } else if ([1, 2, 3].includes(code)) {
+                icon = "⛅";
+                if (temp >= 25) note = "It's going to be hot. Stay hydrated! 💧";
+              } else if ([45, 48].includes(code)) {
+                icon = "🌫️";
+              } else if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) {
+                icon = "🌧️";
+                note = "Rain expected. Consider a covered pitch. ☔";
+              }
+
+              setWeatherIcon(icon);
+              setWeatherNote(note);
+
+            } catch (err) {
+              console.error("Weather API error:", err);
+            }
+          }
+
         } else {
           console.warn("Event not found!");
         }
@@ -185,6 +255,12 @@ export default function EventDetailScreen() {
     }
   };
 
+  const handleNavigate = () => {
+    if (!event?.location) return;
+    const { latitude, longitude } = event.location;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    Linking.openURL(url);
+  };
 
 
   const handleLeave = async () => {
@@ -497,6 +573,31 @@ export default function EventDetailScreen() {
         <Text style={styles.value}>
           {new Date(event.date?.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
+        {address && (
+          <>
+            <Text style={styles.label}>Address:</Text>
+            <Text style={styles.value}>{address}</Text>
+            <TouchableOpacity onPress={handleNavigate} style={styles.navButton}>
+              <Text style={styles.navText}>Navigate to this location</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+       {weather && (
+  <View style={{ marginTop: 10 }}>
+    <Text style={styles.label}>Predicted Weather:</Text>
+    <Text style={styles.value}>
+      {weatherIcon} {weather.temp}°C
+    </Text>
+    {weatherNote !== "" && (
+      <Text style={[styles.value, { fontStyle: "italic", fontSize: 14 }]}>
+        {weatherNote}
+      </Text>
+    )}
+  </View>
+)}
+
+
 
 
         <Text style={styles.label}>Game Method:</Text>
@@ -683,4 +784,16 @@ const styles = StyleSheet.create({
     color: "#444",
     fontWeight: "600",
   },
+  navButton: {
+    backgroundColor: "#1877F2",
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  navText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+
 });
