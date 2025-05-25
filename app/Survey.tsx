@@ -56,7 +56,7 @@ export default function SurveyScreen() {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission Denied", "Map will use default location (Tel Aviv).");
+        Alert.alert("Permission Denied", "Map will use default location (Tel Aviv)");
         return;
       }
 
