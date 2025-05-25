@@ -21,8 +21,8 @@ export default function BottomNav() {
         <Ionicons name="people" size={35} color="#1877F2" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.navItem} onPress={() => router.push("/Profile")}>
-  <Ionicons name="person-circle" size={35} color="#1877F2" />
-</TouchableOpacity>
+        <Ionicons name="person-circle" size={35} color="#1877F2" />
+      </TouchableOpacity>
 
     </View>
   );
