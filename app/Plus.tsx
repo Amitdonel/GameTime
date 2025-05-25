@@ -164,7 +164,7 @@
           <View style={styles.section}>
             <TextInput
               style={styles.input}
-              placeholder="Event Name"
+              placeholder="Event Name:"
               placeholderTextColor="#aaa"
               value={eventName}
               onChangeText={setEventName}
