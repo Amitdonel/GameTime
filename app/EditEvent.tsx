@@ -18,6 +18,8 @@ import Slider from "@react-native-community/slider";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNav from "../components/BottomNav";
 import axios from "axios";
+import * as ImagePicker from "expo-image-picker";
+
 
 export default function EditEventScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
@@ -31,6 +33,7 @@ export default function EditEventScreen() {
 
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState<any>({});
+  const [customImageUri, setCustomImageUri] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,6 +103,11 @@ export default function EditEventScreen() {
               longitude: 34.78,
             },
           });
+
+          if (data.image && typeof data.image === "string" && data.image.startsWith("http")) {
+            setCustomImageUri(data.image);
+          }
+
         } else {
           Alert.alert("Event not found");
           router.back();
@@ -115,9 +123,63 @@ export default function EditEventScreen() {
     fetchEvent();
   }, [eventId]);
 
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission required", "We need access to your gallery.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+
+    if (!result.canceled && result.assets?.length) {
+      setCustomImageUri(result.assets[0].uri);
+    }
+  };
+
+  const takePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission required", "We need access to your camera.");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+
+    if (!result.canceled && result.assets?.length) {
+      setCustomImageUri(result.assets[0].uri);
+    }
+  };
+
+  const openImageOptions = () => {
+    Alert.alert("Upload Image", "Choose source", [
+      { text: "Camera", onPress: takePhoto },
+      { text: "Gallery", onPress: pickImage },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+
   const handleSave = async () => {
     try {
       const ref = doc(db, "events", eventId!);
+
+      const imageToSave = customImageUri || eventData.image || "https://via.placeholder.com/100";
+
+      if (!imageToSave) {
+        Alert.alert("Missing image", "Please select or upload an image.");
+        return;
+      }
+
       await updateDoc(ref, {
         name: eventData.name,
         date: Timestamp.fromDate(new Date(eventData.date)),
@@ -125,8 +187,9 @@ export default function EditEventScreen() {
         maxPlayers: Number(eventData.maxPlayers),
         description: eventData.description,
         location: eventData.location,
-        image: eventData.image,
+        image: imageToSave,
       });
+
       Alert.alert("Success", "Event updated!");
       router.push({ pathname: "/EventDetail", params: { eventId } });
     } catch (err) {
@@ -134,6 +197,9 @@ export default function EditEventScreen() {
       Alert.alert("Error", "Could not save event.");
     }
   };
+
+
+
 
   if (loading) {
     return (
@@ -266,11 +332,36 @@ export default function EditEventScreen() {
 
         <Text style={styles.label}>Choose Image:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
+          <View style={{ alignItems: "center", marginBottom: 10 }}>
+            <TouchableOpacity onPress={openImageOptions}>
+              <Image
+                source={
+                  customImageUri
+                    ? { uri: customImageUri }
+                    : { uri: "https://via.placeholder.com/100" }
+                }
+                style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: 12,
+                  borderWidth: 2,
+                  borderColor: "#1877F2",
+                  marginBottom: 5,
+                }}
+              />
+              <Text style={{ color: "#1877F2" }}>Upload Custom Image</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={{ flexDirection: "row" }}>
             {["soccer.jpg", "soccer1.jpg", "soccer2.jpg", "soccer3.jpg"].map((img) => (
               <TouchableOpacity
                 key={img}
-                onPress={() => setEventData({ ...eventData, image: img })}
+                onPress={() => {
+                  setCustomImageUri(null);
+                  setEventData({ ...eventData, image: img });
+                }}
+
                 style={{ marginRight: 10 }}
               >
                 <Image
