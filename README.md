@@ -1,4 +1,4 @@
-# 🕹️ GameTime – Pickup Match Manager
+# ⚽︎ GameTime 
 
 GameTime is a mobile-first React Native app built for organizing and joining pickup sports matches effortlessly.
 Whether you're looking to manage local games or find events nearby, GameTime offers an intuitive, location-based experience to bring players together.
