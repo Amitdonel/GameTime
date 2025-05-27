@@ -130,7 +130,7 @@ export default function PlusScreen() {
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert("Permission required", "We need access to your gallery to choose a picture ");
+      Alert.alert("Permission required", "We need access to your gallery to choose a picture.");
       return;
     }
 
