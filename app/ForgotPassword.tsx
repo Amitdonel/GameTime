@@ -21,7 +21,7 @@ export default function ForgotPasswordScreen() {
 
   const handleReset = async () => {
     if (!email) {
-      Alert.alert("Missing Info", "Please enter your email address.");
+      Alert.alert("Missing Info", "Please enter your email address");
       return;
     }
     try {
