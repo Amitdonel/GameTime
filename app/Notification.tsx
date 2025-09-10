@@ -1,52 +1,150 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ImageBackground,
+  ActivityIndicator,
+} from "react-native";
 import BottomNav from "../components/BottomNav";
-import { collection, getDocs, query, where, orderBy, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  writeBatch,
+  doc,
+  deleteDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../functions/lib/firebaseConfig";
 import { getAuth } from "firebase/auth";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { StatusBar } from "expo-status-bar";
+
+// ---- Brand tokens (keep consistent with other screens) ----
+const BRAND = {
+  primary: "#1877F2",
+  textOnDark: "#ffffff",
+  overlay: "rgba(0,0,0,0.55)",
+  glassBg: "rgba(255,255,255,0.10)",
+  glassBorder: "rgba(255,255,255,0.25)",
+  inputBg: "rgba(255,255,255,0.95)",
+  muted: "rgba(255,255,255,0.85)",
+  success: "#22c55e",
+  warn: "#f59e0b",
+  danger: "#ef4444",
+};
+const bgImage = require("../assets/images/soccer.jpg");
+
+// ---- Helpers ----
+const TYPE_META: Record<
+  string,
+  { color: string; icon: string; label: string }
+> = {
+  "player-joined": {
+    color: BRAND.success,
+    icon: "checkmark-circle",
+    label: "Player joined your match",
+  },
+  "player-left": {
+    color: BRAND.danger,
+    icon: "alert-circle",
+    label: "Player left your match",
+  },
+  "match-full": {
+    color: BRAND.warn,
+    icon: "flame",
+    label: "Your match is now full",
+  },
+  "teams-created": {
+    color: BRAND.primary,
+    icon: "game-controller",
+    label: "Teams created for your match",
+  },
+};
+
+const toDate = (ts: any): Date => {
+  // Accept Firestore Timestamp, millis number, or Date
+  if (ts?.toDate) return ts.toDate();
+  if (typeof ts === "number") return new Date(ts);
+  if (ts instanceof Date) return ts;
+  return new Date();
+};
+
+const timeAgo = (d: Date) => {
+  const diff = Date.now() - d.getTime();
+  const secs = Math.max(1, Math.floor(diff / 1000));
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+};
 
 export default function NotificationScreen() {
-  const [notifications, setNotifications] = useState<any[]>([]);
   const user = getAuth().currentUser;
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
+  // Live query for this user, newest first
   useEffect(() => {
     if (!user) return;
+    const q = query(
+      collection(db, "notifications"),
+      where("toUser", "==", user.uid),
+      orderBy("timestamp", "desc")
+    );
 
-    const fetchNotifications = async () => {
-      try {
-        const snapshot = await getDocs(
-          query(collection(db, "notifications"), where("toUser", "==", user.uid), orderBy("timestamp", "desc"))
-        );
-        const notiData = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as { read: boolean }) }));
-        setNotifications(notiData);
-
-        // Mark as read
-        notiData.forEach(noti => {
-          if (!noti.read) {
-            updateDoc(doc(db, "notifications", noti.id), { read: true });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setNotifications(rows);
+        setLoading(false);
+        // Mark all unread as read (batched)
+        const batch = writeBatch(db);
+        rows.forEach((n: any) => {
+          if (!n.read) {
+            batch.update(doc(db, "notifications", n.id), { read: true });
           }
         });
-      } catch (error) {
-        console.error("Failed to fetch notifications:", error);
+        if (rows.some((n: any) => !n.read)) {
+          batch.commit().catch(() => {});
+        }
+      },
+      (err) => {
+        console.error("Failed to fetch notifications:", err);
+        setLoading(false);
       }
-    };
+    );
 
-    fetchNotifications();
-  }, []);
+    return () => unsub();
+  }, [user]);
+
+  const unreadCount = useMemo(
+    () => notifications.filter((n: any) => !n.read).length,
+    [notifications]
+  );
 
   const handleClearAll = () => {
-    Alert.alert("Clear All?", "Are you sure you want to delete all notifications?", [
+    if (!user || notifications.length === 0) return;
+    Alert.alert("Clear all?", "Delete all notifications permanently?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete All",
         style: "destructive",
         onPress: async () => {
           try {
-            if (!user) return;
-            const notiDocs = await getDocs(query(collection(db, "notifications"), where("toUser", "==", user.uid)));
-            const deleteBatch = notiDocs.docs.map(notiDoc => deleteDoc(doc(db, "notifications", notiDoc.id)));
-            await Promise.all(deleteBatch);
-            setNotifications([]);
+            const batch = writeBatch(db);
+            notifications.forEach((n) => batch.delete(doc(db, "notifications", n.id)));
+            await batch.commit();
           } catch (error) {
             console.error("Failed to delete notifications:", error);
           }
@@ -55,107 +153,220 @@ export default function NotificationScreen() {
     ]);
   };
 
+  const handleDeleteOne = (id: string) => {
+    Alert.alert("Delete notification?", "", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(db, "notifications", id));
+          } catch (e) {
+            console.error("Failed to delete notification:", e);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleToggleRead = async (n: any) => {
+    try {
+      await updateDoc(doc(db, "notifications", n.id), { read: !n.read });
+    } catch (e) {
+      // ignore
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Your Notifications</Text>
-        {notifications.length > 0 && (
-          <TouchableOpacity onPress={handleClearAll}>
-            <Text style={styles.clearButton}>Clear All ❌</Text>
-          </TouchableOpacity>
-        )}
+    <ImageBackground source={bgImage} style={{ flex: 1 }} resizeMode="cover">
+      <StatusBar style="light" />
+      <View style={styles.overlay} />
+
+      {/* Glass header */}
+      <View style={styles.header}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Ionicons name="notifications-outline" size={20} color={BRAND.textOnDark} />
+          <Text style={styles.headerTitle}>Your Notifications</Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          {unreadCount > 0 && (
+            <View style={styles.unreadPill}>
+              <Text style={styles.unreadPillText}>{unreadCount} new</Text>
+            </View>
+          )}
+          {notifications.length > 0 && (
+            <TouchableOpacity onPress={handleClearAll} activeOpacity={0.85} style={styles.clearBtn}>
+              <Ionicons name="trash-outline" size={16} color="#fff" />
+              <Text style={styles.clearText}>Clear All</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          {notifications.length === 0 ? (
-            <Text style={styles.info}>You have no notifications yet.</Text>
-          ) : (
-            notifications.map((noti) => (
-              <View key={noti.id} style={[styles.notiCard, { borderLeftColor: getColor(noti.type) }]}>
-                <Text style={styles.notiMessage}>
-                  {noti.type === "player-joined" && "✅ Player joined your match"}
-                  {noti.type === "player-left" && "⚠ Player left your match"}
-                  {noti.type === "match-full" && "🔥 Your match is now full"}
-                  {noti.type === "teams-created" && "🎮 Teams created for your match"}
-                </Text>
-                <Text style={styles.notiEventName}>"{noti.eventName}"</Text>
-                <Text style={styles.notiTimestamp}>
-                  {new Date(noti.timestamp).toLocaleString()}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
+        {loading ? (
+          <View style={{ alignItems: "center", marginTop: 20 }}>
+            <ActivityIndicator color="#fff" />
+            <Text style={{ color: "#fff", marginTop: 6 }}>Loading…</Text>
+          </View>
+        ) : notifications.length === 0 ? (
+          <Text style={styles.empty}>You have no notifications yet.</Text>
+        ) : (
+          <View style={{ gap: 10 }}>
+            {notifications.map((n: any) => {
+              const meta = TYPE_META[n.type] || {
+                color: "#94a3b8",
+                icon: "information-circle",
+                label: "Update",
+              };
+              const when = toDate(n.timestamp);
+              const isUnread = !n.read;
+
+              return (
+                <View key={n.id} style={[styles.notiCard, { borderLeftColor: meta.color }]}>
+                  <View style={styles.notiTop}>
+                    <View style={[styles.iconWrap, { backgroundColor: `${meta.color}33` }]}>
+                      <Ionicons name={String(meta.icon)} size={18} color={meta.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.notiLabel} numberOfLines={1}>
+                        {meta.label}
+                      </Text>
+                      <Text style={styles.notiEvent} numberOfLines={1}>
+                        “{n.eventName || "Unnamed match"}”
+                      </Text>
+                    </View>
+
+                    <View style={{ alignItems: "flex-end", gap: 8 }}>
+                      <Text style={styles.notiTime}>{timeAgo(when)}</Text>
+
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity
+                          onPress={() => handleToggleRead(n)}
+                          style={[styles.smallBtn, { backgroundColor: isUnread ? BRAND.primary : "rgba(255,255,255,0.16)" }]}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons
+                            name={isUnread ? "mail-unread-outline" : "mail-open-outline"}
+                            size={14}
+                            color="#fff"
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteOne(n.id)}
+                          style={[styles.smallBtn, { backgroundColor: "rgba(239,68,68,0.22)" }]}
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="close" size={14} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  {n.message ? <Text style={styles.notiBody}>{n.message}</Text> : null}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Spacer for BottomNav */}
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       <BottomNav />
-    </View>
+    </ImageBackground>
   );
 }
 
-// Helper for color per type
-const getColor = (type: string) => {
-  switch (type) {
-    case "player-joined":
-      return "#28a745";
-    case "player-left":
-      return "#dc3545";
-    case "match-full":
-      return "#ff9800";
-    case "teams-created":
-      return "#1877F2";
-    default:
-      return "#999";
-  }
-};
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5" },
-  headerRow: {
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: BRAND.overlay },
+
+  // Header (glass)
+  header: {
+    marginTop: 46,
+    marginHorizontal: 16,
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: BRAND.glassBg,
+    borderWidth: 1,
+    borderColor: BRAND.glassBorder,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 15,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderColor: "#ddd",
-    zIndex: 10,
-  },
-  sectionTitle: { fontSize: 26, fontWeight: "bold", color: "#1877F2" },
-  clearButton: { fontSize: 14, color: "#dc3545", fontWeight: "bold" },
-  scrollContent: { paddingBottom: 120, paddingHorizontal: 20, marginTop: 15 },
-  content: {},
-  info: { fontSize: 16, color: "#555", textAlign: "center", marginTop: 40 },
-  notiCard: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    borderLeftWidth: 5,
-    borderColor: "#ddd",
+    justifyContent: "space-between",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
   },
-  notiMessage: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
+  headerTitle: { color: BRAND.textOnDark, fontSize: 18, fontWeight: "800" },
+
+  clearBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  notiEventName: {
-    fontSize: 15,
-    color: "#555",
-    marginTop: 4,
+  clearText: { color: "#fff", fontWeight: "700" },
+
+  unreadPill: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
-  notiTimestamp: {
-    fontSize: 12,
-    color: "#999",
-    marginTop: 8,
-    textAlign: "right",
+  unreadPillText: { color: "#111827", fontWeight: "800", fontSize: 12 },
+
+  scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
+
+  empty: {
+    color: BRAND.muted,
+    textAlign: "center",
+    marginTop: 24,
+  },
+
+  // Notification card (glass)
+  notiCard: {
+    backgroundColor: BRAND.glassBg,
+    borderColor: BRAND.glassBorder,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    borderLeftWidth: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+  },
+  notiTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notiLabel: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  notiEvent: { color: "#E5E7EB", marginTop: 2 },
+  notiTime: { color: "#CBD5E1", fontSize: 12 },
+
+  smallBtn: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+
+  notiBody: {
+    color: "#E5E7EB",
+    marginTop: 10,
+    lineHeight: 20,
   },
 });

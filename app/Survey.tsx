@@ -1,12 +1,13 @@
 import { db } from "../functions/lib/firebaseConfig";
 import { getAuth } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import MapView, { Circle, Marker } from "react-native-maps";
+import MapView, { Circle, Marker, Region } from "react-native-maps";
 import * as Location from "expo-location";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Slider from "@react-native-community/slider";
+import axios from "axios";
 import {
   Text,
   View,
@@ -15,17 +16,37 @@ import {
   ScrollView,
   ImageBackground,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
-import axios from "axios";
-import { TextInput, FlatList, TouchableWithoutFeedback } from "react-native";
-
 
 const backgroundImage = require("../assets/images/soccer.jpg");
+
+// Reusable brand tokens (keep aligned with Login/SignUp)
+const BRAND = {
+  primary: "#1877F2",
+  textOnDark: "#ffffff",
+  glassBg: "rgba(255,255,255,0.10)",
+  glassBorder: "rgba(255,255,255,0.25)",
+  darkOverlay: "rgba(0,0,0,0.55)",
+  inputBg: "rgba(255,255,255,0.95)",
+  muted: "#9CA3AF",
+  surface: "#ffffff",
+  border: "#E5E7EB",
+};
+
+type Suggestion = { display_name: string; lat: string; lon: string };
 
 export default function SurveyScreen() {
   const router = useRouter();
   const { from } = useLocalSearchParams();
 
+  // Form state
   const [positions, setPositions] = useState<string[]>([]);
   const [skillLevel, setSkillLevel] = useState("");
   const [stamina, setStamina] = useState("");
@@ -35,151 +56,159 @@ export default function SurveyScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDob, setTempDob] = useState(new Date());
   const [playRadius, setPlayRadius] = useState(10);
-  const [location, setLocation] = useState({
-    latitude: 32.0853,
-    longitude: 34.7818,
-  });
 
-  const [region, setRegion] = useState({
+  // Location + map
+  const [region, setRegion] = useState<Region>({
     latitude: 32.0853,
     longitude: 34.7818,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   });
+  const [location, setLocation] = useState({ latitude: 32.0853, longitude: 34.7818 });
 
+  // Address search (debounced)
   const [searchQuery, setSearchQuery] = useState("");
-  type Suggestion = { display_name: string; lat: string; lon: string };
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reverseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeq = useRef(0); // used to ignore stale results
 
-
+  // On mount: ask permission and set current location
   useEffect(() => {
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Denied", "Map will use default location (Tel Aviv)");
-        return;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission Denied", "Map will use default location (Tel Aviv)");
+          return;
+        }
+        const currentLocation = await Location.getCurrentPositionAsync({});
+        const { latitude, longitude } = currentLocation.coords;
+
+        const newRegion = { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+        setRegion(newRegion);
+        setLocation({ latitude, longitude });
+        // Trigger a single reverse geocode for the initial location
+        debouncedReverseGeocode(latitude, longitude);
+      } catch {
+        // Keep defaults on failure
       }
-
-      const currentLocation = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = currentLocation.coords;
-
-      setRegion({
-        latitude,
-        longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-
-      setLocation({ latitude, longitude });
     })();
   }, []);
 
+  // Load existing survey
   useEffect(() => {
-    const fetchSurveyData = async () => {
+    (async () => {
       const user = getAuth().currentUser;
       if (!user) return;
-
       const docRef = doc(db, "surveys", user.uid);
-      const docSnap = await getDoc(docRef);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return;
 
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setPositions(data.positions || []);
-        setSkillLevel(data.skillLevel || "");
-        setStamina(data.stamina || "");
-        setFieldType(data.fieldType || "");
-        setPlayFrequency(data.playFrequency || "");
-        setDob(data.dob ? new Date(data.dob) : new Date());
-        setPlayRadius(data.playRadius || 10);
-        if (data.location) {
-          setLocation(data.location);
-          setRegion({
-            ...data.location,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          });
-        }
+      const data = snap.data();
+      setPositions(data.positions || []);
+      setSkillLevel(data.skillLevel || "");
+      setStamina(data.stamina || "");
+      setFieldType(data.fieldType || "");
+      setPlayFrequency(data.playFrequency || "");
+      setDob(data.dob ? new Date(data.dob) : new Date());
+      setPlayRadius(data.playRadius || 10);
+
+      if (data.location?.latitude && data.location?.longitude) {
+        const r = {
+          latitude: data.location.latitude,
+          longitude: data.location.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        };
+        setRegion(r);
+        setLocation({ latitude: r.latitude, longitude: r.longitude });
+        debouncedReverseGeocode(r.latitude, r.longitude);
       }
-    };
-
-    fetchSurveyData();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Chip toggles
   const togglePosition = (role: string) => {
-    setPositions((prevPositions) =>
-      prevPositions.includes(role)
-        ? prevPositions.filter((item) => item !== role)
-        : [...prevPositions, role]
-    );
+    setPositions((prev) => (prev.includes(role) ? prev.filter((x) => x !== role) : [...prev, role]));
   };
 
-  const handleAddressChange = async (text: string) => {
+  // Debounced address search to avoid 429 from Nominatim
+  const handleAddressChange = (text: string) => {
     setSearchQuery(text);
-    if (text.length < 3) return setSuggestions([]);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (text.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    searchTimer.current = setTimeout(() => doSearch(text), 400);
+  };
 
+  const doSearch = async (q: string) => {
     try {
-      const response = await axios.get(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${text}`,
-        {
-          headers: {
-            "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
-          },
-        }
-      );
-      setSuggestions(response.data);
+      setSearchLoading(true);
+      const seq = ++searchSeq.current;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        q
+      )}&limit=6&addressdetails=0`;
+      const res = await axios.get(url, {
+        headers: {
+          "User-Agent": "GameTimeApp/1.0 (support@gametime.example)",
+          "Accept-Language": "en",
+        },
+        timeout: 8000,
+      });
+      // Ignore stale results
+      if (seq !== searchSeq.current) return;
+      setSuggestions(res.data ?? []);
     } catch (err) {
-      console.error("Address autocomplete error:", err);
+      // Swallow and keep UI snappy
+      setSuggestions([]);
+    } finally {
+      setSearchLoading(false);
     }
   };
+
+  // Debounced reverse geocoding when the region settles
+  const debouncedReverseGeocode = (lat: number, lon: number) => {
+    if (reverseTimer.current) clearTimeout(reverseTimer.current);
+    reverseTimer.current = setTimeout(() => reverseGeocode(lat, lon), 600);
+  };
+
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
-      const response = await axios.get(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
-        {
-          headers: {
-            "User-Agent": "GameTimeApp/1.0 (contact@example.com)",
-          },
-        }
-      );
-      if (response.data && response.data.display_name) {
-        setSearchQuery(response.data.display_name);
-      }
-    } catch (err) {
-      console.error("Reverse geocoding failed:", err);
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+      const res = await axios.get(url, {
+        headers: {
+          "User-Agent": "GameTimeApp/1.0 (support@gametime.example)",
+          "Accept-Language": "en",
+        },
+        timeout: 8000,
+      });
+      if (res.data?.display_name) setSearchQuery(res.data.display_name);
+    } catch {
+      // ignore reverse failures
     }
   };
 
-
-  const handleSelectSuggestion = (place: any) => {
+  const handleSelectSuggestion = (place: Suggestion) => {
     const newLat = parseFloat(place.lat);
     const newLon = parseFloat(place.lon);
-
-    setRegion({
-      latitude: newLat,
-      longitude: newLon,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    });
-
+    const r = { latitude: newLat, longitude: newLon, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+    setRegion(r);
     setLocation({ latitude: newLat, longitude: newLon });
     setSearchQuery(place.display_name);
     setSuggestions([]);
   };
 
-
+  // Submit
   const handleSubmit = async () => {
-    if (
-      positions.length === 0 ||
-      !skillLevel ||
-      !stamina ||
-      !fieldType ||
-      !playFrequency ||
-      !playRadius
-    ) {
+    if (!canSubmit) {
       Alert.alert("Incomplete Form", "Please answer all questions before submitting.");
       return;
     }
-
     const user = getAuth().currentUser;
     if (!user) {
       Alert.alert("Error", "User not authenticated");
@@ -188,24 +217,21 @@ export default function SurveyScreen() {
 
     try {
       const docRef = doc(db, "surveys", user.uid);
-      const docSnap = await getDoc(docRef);
-      const existingData = docSnap.exists() ? docSnap.data() : {};
+      const snap = await getDoc(docRef);
+      const existing = snap.exists() ? snap.data() : {};
 
-      let updatedPositionsTemp = existingData.positionsTemp || [...positions];
-      const lastPositionPlayed = existingData.lastPositionPlayed || [];
+      let updatedPositionsTemp = existing.positionsTemp || [...positions];
+      const lastPositionPlayed = existing.lastPositionPlayed || [];
 
-      // Add any newly selected positions to positionsTemp only if not in temp or LPP
+      // Add newly selected positions into positionsTemp only if not already in temp or LPP
       for (const pos of positions) {
-        if (
-          !updatedPositionsTemp.includes(pos) &&
-          !lastPositionPlayed.includes(pos)
-        ) {
+        if (!updatedPositionsTemp.includes(pos) && !lastPositionPlayed.includes(pos)) {
           updatedPositionsTemp.push(pos);
         }
       }
 
       const payload = {
-        positions, // static preferred positions
+        positions,                       // static preferred positions
         skillLevel,
         stamina,
         fieldType,
@@ -217,374 +243,416 @@ export default function SurveyScreen() {
         lastPositionPlayed,
       };
 
-      await setDoc(docRef, { ...existingData, ...payload });
-
+      await setDoc(docRef, { ...existing, ...payload });
       Alert.alert("Success", "Survey updated successfully!", [
         {
           text: "OK",
-          onPress: () => {
-            if (from === "Profile") {
-              router.push("/Profile");
-            } else {
-              router.push("/Login");
-            }
-          },
+          onPress: () => router.push(from === "Profile" ? "/Profile" : "/Login"),
         },
       ]);
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "An error occurred while saving survey.");
+    } catch (e: any) {
+      Alert.alert("Error", e?.message || "An error occurred while saving survey.");
     }
   };
 
+  // Derived UI helpers
+  const canSubmit = useMemo(
+    () =>
+      positions.length > 0 &&
+      !!skillLevel &&
+      !!stamina &&
+      !!fieldType &&
+      !!playFrequency &&
+      !!playRadius,
+    [positions, skillLevel, stamina, fieldType, playFrequency, playRadius]
+  );
+
+  const POSITIONS = ["Goalkeeper", "Defender", "Midfielder", "Attacker"];
+  const SKILL = [
+    "Beginner ⭐",
+    "Average ⭐⭐",
+    "Intermediate ⭐⭐⭐",
+    "Advanced ⭐⭐⭐⭐",
+    "Professional ⭐⭐⭐⭐⭐",
+  ];
+  const STAMINA = ["Low", "Medium", "High"];
+  const FIELD = ["Grass", "Asphalt", "No preference"];
+  const FREQ = [
+    "Rarely (Only in video games)",
+    "Occasionally (Once or twice a month)",
+    "Regularly (Weekly or more)",
+    "Frequently (Multiple times per week)",
+  ];
 
   return (
-    <ImageBackground source={backgroundImage} style={styles.background}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Header with Back Button and Title */}
-        <View style={styles.headerContainer}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.push(from === "Profile" ? "/Profile" : "/SignUp")}
-          >
-            <Text style={styles.backArrow}>←</Text>
-          </TouchableOpacity>
-          <View style={{ flex: 1, alignItems: "center" }}>
-            <Text style={styles.title}>Player Survey</Text>
-          </View>
-        </View>
-
-        {/* Date of Birth */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>What is your Date of Birth?</Text>
-        </View>
-        <TouchableOpacity style={styles.datePicker} onPress={() => setShowDatePicker(true)}>
-          <Text style={styles.optionText}>{dob.toDateString()}</Text>
-        </TouchableOpacity>
-
-        {showDatePicker && (
-          <View style={styles.datePickerContainer}>
-            <DateTimePicker
-              value={tempDob}
-              mode="date"
-              display="spinner"
-              minimumDate={new Date(1900, 0, 1)}
-              maximumDate={new Date()}
-              onChange={(event, selectedDate) => {
-                if (selectedDate) setTempDob(selectedDate);
-              }}
-            />
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={() => {
-                setDob(tempDob);
-                setShowDatePicker(false);
-              }}
-            >
-              <Text style={styles.confirmButtonText}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Positions */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>Which position would you like to play? (Select multiple)</Text>
-        </View>
-        {["Goalkeeper", "Defender", "Midfielder", "Attacker"].map((role) => (
-          <TouchableOpacity
-            key={role}
-            style={[styles.option, positions.includes(role) && styles.selectedOption]}
-            onPress={() => togglePosition(role)}
-          >
-            <Text style={styles.optionText}>{role}</Text>
-          </TouchableOpacity>
-        ))}
-
-        {/* Skill Level */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>What is your skill level (1-5)?</Text>
-        </View>
-        {["Beginner ⭐", "Average ⭐⭐", "Intermediate ⭐⭐⭐", "Advanced ⭐⭐⭐⭐", "Professional ⭐⭐⭐⭐⭐"].map((level) => (
-          <TouchableOpacity
-            key={level}
-            style={[styles.option, skillLevel === level && styles.selectedOption]}
-            onPress={() => setSkillLevel(level)}
-          >
-            <Text style={styles.optionText}>{level}</Text>
-          </TouchableOpacity>
-        ))}
-
-        {/* Stamina */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>How would you describe your stamina and athleticism?</Text>
-        </View>
-        {["Low", "Medium", "High"].map((level) => (
-          <TouchableOpacity
-            key={level}
-            style={[styles.option, stamina === level && styles.selectedOption]}
-            onPress={() => setStamina(level)}
-          >
-            <Text style={styles.optionText}>{level}</Text>
-          </TouchableOpacity>
-        ))}
-
-        {/* Field Type */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>What type of field do you prefer to play on?</Text>
-        </View>
-        {["Grass", "Asphalt", "No preference"].map((type) => (
-          <TouchableOpacity
-            key={type}
-            style={[styles.option, fieldType === type && styles.selectedOption]}
-            onPress={() => setFieldType(type)}
-          >
-            <Text style={styles.optionText}>{type}</Text>
-          </TouchableOpacity>
-        ))}
-
-        {/* Play Frequency */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>How often do you play football?</Text>
-        </View>
-        {[
-          "Rarely (Only in video games)",
-          "Occasionally (Once or twice a month)",
-          "Regularly (Weekly or more)",
-          "Frequently (Multiple times per week)",
-        ].map((freq) => (
-          <TouchableOpacity
-            key={freq}
-            style={[styles.option, playFrequency === freq && styles.selectedOption]}
-            onPress={() => setPlayFrequency(freq)}
-          >
-            <Text style={styles.optionText}>{freq}</Text>
-          </TouchableOpacity>
-        ))}
-
-
-
-
-        {/* Location */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>Insert your location</Text>
-        </View>
-
-        <View style={{ width: "90%", marginTop: 20 }}>
-          <TextInput
-            style={{
-              backgroundColor: "white",
-              borderColor: "#ddd",
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 10,
-            }}
-            placeholder="Search for address..."
-            value={searchQuery}
-            onChangeText={handleAddressChange}
-          />
-
-          {suggestions.length > 0 && (
-            <View
-              style={{
-                backgroundColor: "white",
-                borderColor: "#ddd",
-                borderWidth: 1,
-                borderRadius: 8,
-                marginTop: 5,
-                maxHeight: 150,
-              }}
-            >
-              {suggestions.map((place, index) => (
+    <ImageBackground source={backgroundImage} style={styles.bg} resizeMode="cover">
+      <View style={styles.overlay} />
+      <SafeAreaView style={{ flex: 1, width: "100%" }}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+              {/* Header */}
+              <View style={styles.headerRow}>
                 <TouchableOpacity
-                  key={index}
-                  onPress={() => handleSelectSuggestion(place)}
-                  style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: "#eee" }}
+                  style={styles.backButton}
+                  onPress={() => router.push(from === "Profile" ? "/Profile" : "/SignUp")}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text>{place.display_name}</Text>
+                  <Text style={styles.backArrow}>←</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+                <Text style={styles.title}>Player Survey</Text>
+                <View style={{ width: 36 }} />{/* spacer */}
+              </View>
 
-        {location && (
-          <View style={{ width: "90%", height: 300, marginVertical: 20 }}>
-            <MapView
-              style={{ flex: 1 }}
-              region={region}
-              onRegionChangeComplete={(newRegion) => {
-                setRegion(newRegion);
-                const lat = newRegion.latitude;
-                const lon = newRegion.longitude;
-                setLocation({ latitude: lat, longitude: lon });
-                reverseGeocode(lat, lon);
-              }}
-            >
-              <Marker coordinate={region} pinColor="red" />
-              {/* 🟢 Add the circle that updates live */}
-              <Circle
-                center={region}
-                radius={playRadius * 1000} // Radius in meters
-                strokeColor="rgba(24, 119, 242, 0.8)"
-                fillColor="rgba(24, 119, 242, 0.2)"
-              />
-            </MapView>
-          </View>
-        )}
+              {/* DOB */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Date of Birth</Text>
+                <TouchableOpacity style={styles.inputBox} onPress={() => setShowDatePicker(true)}>
+                  <Text style={styles.inputBoxText}>{dob.toDateString()}</Text>
+                </TouchableOpacity>
 
-        {/* Match Radius */}
-        <View style={styles.questionBox}>
-          <Text style={styles.question}>Select your preferred match search radius (km)</Text>
-        </View>
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderValue}>{playRadius} km</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={5}
-            maximumValue={50}
-            step={5}
-            value={playRadius}
-            onValueChange={(value) => {
-              setPlayRadius(value);
-              setRegion((prev) => ({
-                ...prev,
-                latitudeDelta: value / 50,
-                longitudeDelta: value / 50,
-              }));
-            }}
-            minimumTrackTintColor="#1877F2"
-            maximumTrackTintColor="#ddd"
-            thumbTintColor="#1877F2"
-          />
-        </View>
+                {showDatePicker && (
+                  <View style={styles.pickerWrap}>
+                  <DateTimePicker
+  value={tempDob}
+  mode="date"
+  display="spinner"        // iOS wheels style
+  themeVariant="dark"      // dark background
+  textColor="#ffffff"      // white numbers/months
+  minimumDate={new Date(1900, 0, 1)}
+  maximumDate={new Date()}
+  onChange={(event, selectedDate) => {
+    if (selectedDate) setTempDob(selectedDate);
+  }}
+/>
 
-        {/* Submit */}
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit</Text>
-        </TouchableOpacity>
-      </ScrollView>
+                    <TouchableOpacity
+                      style={[styles.primaryBtn, { marginTop: 10 }]}
+                      onPress={() => {
+                        setDob(tempDob);
+                        setShowDatePicker(false);
+                      }}
+                    >
+                      <Text style={styles.primaryText}>Confirm</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {/* Positions */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Preferred Positions (select multiple)</Text>
+                <View style={styles.chipsWrap}>
+                  {POSITIONS.map((r) => {
+                    const selected = positions.includes(r);
+                    return (
+                      <TouchableOpacity
+                        key={r}
+                        onPress={() => togglePosition(r)}
+                        style={[styles.chip, selected && styles.chipSelected]}
+                        activeOpacity={0.9}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{r}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Skill */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Skill Level (1–5)</Text>
+                <View style={styles.chipsWrap}>
+                  {SKILL.map((l) => {
+                    const selected = skillLevel === l;
+                    return (
+                      <TouchableOpacity
+                        key={l}
+                        onPress={() => setSkillLevel(l)}
+                        style={[styles.chip, selected && styles.chipSelected]}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{l}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Stamina */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Stamina</Text>
+                <View style={styles.chipsWrap}>
+                  {STAMINA.map((l) => {
+                    const selected = stamina === l;
+                    return (
+                      <TouchableOpacity
+                        key={l}
+                        onPress={() => setStamina(l)}
+                        style={[styles.chip, selected && styles.chipSelected]}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{l}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Field type */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Preferred Field</Text>
+                <View style={styles.chipsWrap}>
+                  {FIELD.map((t) => {
+                    const selected = fieldType === t;
+                    return (
+                      <TouchableOpacity
+                        key={t}
+                        onPress={() => setFieldType(t)}
+                        style={[styles.chip, selected && styles.chipSelected]}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{t}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Frequency */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Play Frequency</Text>
+                <View style={{ gap: 10 }}>
+                  {FREQ.map((f) => {
+                    const selected = playFrequency === f;
+                    return (
+                      <TouchableOpacity
+                        key={f}
+                        onPress={() => setPlayFrequency(f)}
+                        style={[styles.rowOption, selected && styles.rowOptionSelected]}
+                      >
+                        <Text style={[styles.rowOptionText, selected && styles.rowOptionTextSelected]}>{f}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Location / Search */}
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Your Location</Text>
+
+                <View>
+                  <View style={styles.searchRow}>
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search for address…"
+                      placeholderTextColor={BRAND.muted}
+                      value={searchQuery}
+                      onChangeText={handleAddressChange}
+                    />
+                    {searchLoading ? <ActivityIndicator style={{ marginLeft: 8 }} /> : null}
+                  </View>
+
+                  {suggestions.length > 0 && (
+                    <View style={styles.suggestBox}>
+                      {suggestions.map((place, idx) => (
+                        <TouchableOpacity
+                          key={`${place.lat}-${place.lon}-${idx}`}
+                          onPress={() => handleSelectSuggestion(place)}
+                          style={styles.suggestItem}
+                        >
+                          <Text style={styles.suggestText}>{place.display_name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                <View style={{ width: "100%", height: 300, marginTop: 14, borderRadius: 16, overflow: "hidden" }}>
+                  <MapView
+                    style={{ flex: 1 }}
+                    region={region}
+                    onRegionChangeComplete={(r) => {
+                      setRegion(r);
+                      setLocation({ latitude: r.latitude, longitude: r.longitude });
+                      debouncedReverseGeocode(r.latitude, r.longitude);
+                    }}
+                  >
+                    <Marker coordinate={{ latitude: region.latitude, longitude: region.longitude }} pinColor="red" />
+                    <Circle
+                      center={{ latitude: region.latitude, longitude: region.longitude }}
+                      radius={playRadius * 1000}
+                      strokeColor="rgba(24, 119, 242, 0.8)"
+                      fillColor="rgba(24, 119, 242, 0.2)"
+                    />
+                  </MapView>
+                </View>
+
+                {/* Radius */}
+                <View style={{ marginTop: 16, alignItems: "center" }}>
+                  <Text style={styles.labelOnGlass}>Match search radius: {playRadius} km</Text>
+                  <Slider
+                    style={{ width: "100%", height: 40 }}
+                    minimumValue={5}
+                    maximumValue={50}
+                    step={5}
+                    value={playRadius}
+                    onValueChange={(v) => {
+                      setPlayRadius(v);
+                      setRegion((prev) => ({
+                        ...prev,
+                        latitudeDelta: v / 50,
+                        longitudeDelta: v / 50,
+                      }));
+                    }}
+                    minimumTrackTintColor={BRAND.primary}
+                    maximumTrackTintColor="#ddd"
+                    thumbTintColor={BRAND.primary}
+                  />
+                </View>
+              </View>
+
+              {/* Submit */}
+              <TouchableOpacity
+                style={[styles.primaryBtn, !canSubmit && { opacity: 0.7 }]}
+                onPress={handleSubmit}
+                disabled={!canSubmit}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.primaryText}>Submit</Text>
+              </TouchableOpacity>
+
+              <View style={{ height: 28 }} />
+            </ScrollView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-    resizeMode: "cover",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  bg: { flex: 1 },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: BRAND.darkOverlay },
   container: {
     flexGrow: 1,
-    paddingBottom: 80,
-    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingBottom: 24,
   },
-  headerContainer: {
+
+  // Header
+  headerRow: {
+    marginTop: 8,
+    marginBottom: 8,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",
-    width: "90%",
-    marginTop: 50,
-    marginBottom: 20,
+    justifyContent: "space-between",
   },
-  backButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  backArrow: {
-    fontSize: 30,
-    color: "white",
-    fontWeight: "bold",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "white",
-  },
-  questionBox: {
-    width: "90%",
-    padding: 15,
-    backgroundColor: "black",
-    borderRadius: 10,
-    marginTop: 15,
-  },
-  question: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "white",
-    textAlign: "center",
-  },
-  datePicker: {
-    width: "90%",
-    padding: 15,
-    backgroundColor: "white",
-    borderRadius: 10,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  datePickerContainer: {
-    backgroundColor: "white",
-    padding: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    width: "90%",
-    marginVertical: 10,
-  },
-  confirmButton: {
-    marginTop: 10,
-    backgroundColor: "#1877F2",
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-  },
-  confirmButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  submitButton: {
-    backgroundColor: "#1877F2",
-    padding: 15,
-    borderRadius: 10,
-    width: "90%",
-    alignItems: "center",
-    marginTop: 20,
-  },
-  submitButtonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  option: {
-    width: "90%",
-    padding: 15,
-    backgroundColor: "white",
-    borderRadius: 10,
-    marginVertical: 5,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  selectedOption: {
-    backgroundColor: "#1877F2",
-  },
-  optionText: {
-    fontSize: 16,
-    color: "#333",
-  },
-  sliderContainer: {
-    width: "90%",
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  slider: {
+  backButton: { paddingHorizontal: 6, paddingVertical: 4 },
+  backArrow: { fontSize: 28, color: BRAND.textOnDark, fontWeight: "800" },
+  title: { color: BRAND.textOnDark, fontSize: 26, fontWeight: "800" },
+
+  // Glass card
+  card: {
     width: "100%",
-    height: 40,
+    backgroundColor: BRAND.glassBg,
+    borderColor: BRAND.glassBorder,
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 14,
+    marginTop: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 20,
+    elevation: 6,
   },
-  sliderValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "white",
+  cardTitle: {
+    color: BRAND.textOnDark,
+    fontWeight: "800",
     marginBottom: 10,
+    fontSize: 16,
   },
+
+  // Input on glass
+  inputBox: {
+    height: 50,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: BRAND.inputBg,
+    justifyContent: "center",
+  },
+  inputBoxText: { color: "#0F172A", fontSize: 16 },
+
+  // Label on glass
+  labelOnGlass: {
+    color: "rgba(255,255,255,0.9)",
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+
+  // Chips
+  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  chip: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: BRAND.inputBg,
+  },
+  chipSelected: {
+    backgroundColor: BRAND.primary,
+  },
+  chipText: { color: "#0F172A", fontWeight: "700" },
+  chipTextSelected: { color: "#fff" },
+
+  // Long row options
+  rowOption: {
+    backgroundColor: BRAND.inputBg,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  rowOptionSelected: { backgroundColor: BRAND.primary },
+  rowOptionText: { color: "#0F172A", fontWeight: "600" },
+  rowOptionTextSelected: { color: "#fff", fontWeight: "800" },
+
+  // Search
+  searchRow: { flexDirection: "row", alignItems: "center" },
+  searchInput: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    backgroundColor: BRAND.inputBg,
+    color: "#0F172A",
+    fontSize: 16,
+  },
+  suggestBox: {
+    marginTop: 6,
+    maxHeight: 180,
+    backgroundColor: BRAND.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BRAND.border,
+    overflow: "hidden",
+  },
+  suggestItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  suggestText: { color: "#0F172A" },
+
+  // Buttons
+  primaryBtn: {
+    backgroundColor: BRAND.primary,
+    height: 52,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  primaryText: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: 0.3 },
+
+  // Date picker wrap
+  pickerWrap: { alignItems: "center", marginTop: 10 },
 });
